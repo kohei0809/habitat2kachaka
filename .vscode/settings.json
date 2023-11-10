@@ -1,0 +1,7 @@
+{
+    "cmake.sourceDirectory": "/Users/matsumotokohei/Desktop/habitat2kachaka/kachaka-api/ros2/demos/kachaka_bringup/bringup",
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=200",
+    ],
+}
