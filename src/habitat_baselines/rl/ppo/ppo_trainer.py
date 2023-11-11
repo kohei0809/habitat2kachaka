@@ -463,8 +463,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             #self._taken_picture[n][idx] = observations[n]["rgb"]   
                             reward[n] += (ci[n] - ci_pre)     
                             ci[n] -= ci_pre
-                        
-                        ci[n] = 0.0
+                        else:
+                            ci[n] = 0.0
                         
                 # 1つとでも多く被っていた時    
                 else:
@@ -1152,8 +1152,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                                     self._taken_picture[n][idx] = observations[n]["rgb"]   
                                 reward[n] += (ci[n] - ci_pre) 
                                 ci[n] -= ci_pre
-                            
-                            ci[n] = 0.0    
+                            else:
+                                ci[n] = 0.0    
                             
                     # 1つとでも多く被っていた時    
                     else:
