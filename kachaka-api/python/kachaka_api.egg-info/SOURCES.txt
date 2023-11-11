@@ -1,6 +1,8 @@
 LICENSE
 README.md
 pyproject.toml
+python/demos/kachaka_api_pb2.py
+python/demos/kachaka_api_pb2_grpc.py
 python/demos/sample_llm_speak.py
 python/demos/smart_speaker.py
 python/demos/grpc_samples/get_locations.py
@@ -23,3 +25,5 @@ python/kachaka_api/util/command.py
 python/kachaka_api/util/geometry.py
 python/kachaka_api/util/layout.py
 python/kachaka_api/util/vision.py
+python/src/path_follow.py
+python/src/utils.py

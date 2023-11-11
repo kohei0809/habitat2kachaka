@@ -2,10 +2,9 @@ import sys
 import os
 
 import numpy as np
-from utils import move
-
-sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
 import kachaka_api
+from utils import move
+sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
 
 
 if __name__ == "__main__":
