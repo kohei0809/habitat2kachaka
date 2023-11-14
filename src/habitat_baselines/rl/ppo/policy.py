@@ -89,14 +89,7 @@ class PolicyOracle(nn.Module):
     def forward(self, *x):
         raise NotImplementedError
 
-    def act(
-        self,
-        observations,
-        rnn_hidden_states,
-        prev_actions,
-        masks,
-        deterministic=False,
-    ):
+    def act(self, observations, rnn_hidden_states, prev_actions, masks, deterministic=False):
         features, rnn_hidden_states = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
@@ -119,9 +112,7 @@ class PolicyOracle(nn.Module):
         )
         return self.critic(features)
 
-    def evaluate_actions(
-        self, observations, rnn_hidden_states, prev_actions, masks, action
-    ):
+    def evaluate_actions(self, observations, rnn_hidden_states, prev_actions, masks, action):
         features, rnn_hidden_states = self.net(
             observations, rnn_hidden_states, prev_actions, masks
         )
@@ -134,7 +125,6 @@ class PolicyOracle(nn.Module):
         return value, action_log_probs, distribution_entropy, rnn_hidden_states
 
 
-
 class CriticHead(nn.Module):
     def __init__(self, input_size):
         super().__init__()
@@ -144,9 +134,6 @@ class CriticHead(nn.Module):
 
     def forward(self, x):
         return self.fc(x)
-
-
-
 
 
 class BaselinePolicyNonOracle(PolicyNonOracle):
@@ -182,34 +169,6 @@ class BaselinePolicyNonOracle(PolicyNonOracle):
                 global_map_depth=global_map_depth,
                 coordinate_min=coordinate_min,
                 coordinate_max=coordinate_max,
-            ),
-            action_space.n,
-        )
-
-
-class BaselinePolicyOracle(PolicyOracle):
-    def __init__(
-        self,
-        agent_type,
-        observation_space,
-        action_space,
-        goal_sensor_uuid,
-        device,
-        object_category_embedding_size,
-        previous_action_embedding_size,
-        use_previous_action,
-        hidden_size=512,
-    ):
-        super().__init__(
-            BaselineNetOracle(
-                agent_type,
-                observation_space=observation_space,
-                hidden_size=hidden_size,
-                goal_sensor_uuid=goal_sensor_uuid,
-                device=device,
-                object_category_embedding_size=object_category_embedding_size,
-                previous_action_embedding_size=previous_action_embedding_size,
-                use_previous_action=use_previous_action,
             ),
             action_space.n,
         )

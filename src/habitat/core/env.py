@@ -250,18 +250,18 @@ class Env:
 
         self._current_episode = next(self._episode_iterator)
         self.reconfigure(self._config)
-        
-        # Remove existing objects from last episode
-        for objid in self._sim._sim.get_existing_object_ids():  
-            self._sim._sim.remove_object(objid)
             
-         # Insert object here
+        # Insert object here
+        # ここは後で要変更
+        raise NotImplementedError
         object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2,
             'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7
         }
         for i in range(len(self.current_episode.goals)):
             current_goal = self.current_episode.goals[i].object_category
             dataset_index = object_to_datset_mapping[current_goal]
+            
+            raise NotImplementedError
             ind = self._sim._sim.add_object(dataset_index)
             self._sim._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
 

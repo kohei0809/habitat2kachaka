@@ -128,10 +128,6 @@ class InfoRLEnv(RLEnv):
         self._previous_distance = None
         self._previous_action = None
         
-        self._map_resolution = (300, 300)
-        self._coordinate_min = -120.3241-1e-6
-        self._coordinate_max = 120.0399+1e-6
-        
         super().__init__(self._core_env_config, dataset)
         
     def __enter__(self):
@@ -163,7 +159,7 @@ class InfoRLEnv(RLEnv):
             self._rl_config.SUCCESS_REWARD + 1.0,
         )
         
-    # 観測済みのマップを作成
+    # 観測済みのmapの割合の計算
     def _cal_explored_rate(self, top_down_map, fog_of_war_map):
         num = 0.0 # 探索可能範囲のグリッド数
         num_exp = 0.0 # 探索済みの範囲のグリッド数
@@ -190,16 +186,6 @@ class InfoRLEnv(RLEnv):
         reward = self._rl_config.SLACK_REWARD
         ci = -sys.float_info.max
         matrics = None
-        
-        agent_position = self._env._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
-        agent_position = np.array([a_x, a_y])
         
         # distance_to_multi_goalの計算
         current_distance = self._env.get_metrics()["distance_to_multi_goal"]

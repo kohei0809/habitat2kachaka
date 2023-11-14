@@ -61,7 +61,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         super().__init__(config)
         self.actor_critic = None
         self.agent = None
-        self.envs = None
+        self.env = None
         if config is not None:
             logger.info(f"config: {config}")
 
@@ -69,8 +69,9 @@ class PPOTrainerO(BaseRLTrainerOracle):
         self._encoder = None
         
         self._num_picture = config.TASK_CONFIG.TASK.PICTURE.NUM_PICTURE
-        #撮った写真のRGB画像を保存
-        #self._taken_picture = []
+        #撮った写真の
+        # RGB画像を保存
+        self._taken_picture = []
         #撮った写真のciと位置情報、向きを保存
         self._taken_picture_list = []
         
@@ -95,8 +96,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         self.actor_critic = ProposedPolicyOracle(
             agent_type = self.config.TRAINER_NAME,
-            observation_space=self.envs.observation_spaces[0],
-            action_space=self.envs.action_spaces[0],
+            observation_space=self.env.observation_spaces[0],
+            action_space=self.env.action_spaces[0],
             hidden_size=ppo_cfg.hidden_size,
             device=self.device,
             previous_action_embedding_size=self.config.RL.PREVIOUS_ACTION_EMBEDDING_SIZE,
@@ -351,7 +352,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             config.freeze()
 
         logger.info(f"env config: {config}")
-        self.envs = construct_envs(config, get_env_class(config.ENV_NAME))
+        self.env = construct_env(config)
         self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])
@@ -362,15 +363,15 @@ class PPOTrainerO(BaseRLTrainerOracle):
         self._target_index_list = []
         self._taken_index_list = []
         self._observed_object_ci = []
-        for i in range(self.envs.num_envs):
-            self._taken_picture.append([])
-            self._taken_picture_list.append([])
-            self._target_index_list.append([maps.MAP_TARGET_POINT_INDICATOR, maps.MAP_TARGET_POINT_INDICATOR+1, maps.MAP_TARGET_POINT_INDICATOR+2])
-            self._taken_index_list.append([])
-            self._observed_object_ci.append([0, 0, 0])
-            self._dis_pre.append(-1)
         
-        observations = self.envs.reset()
+        self._taken_picture.append([])
+        self._taken_picture_list.append([])
+        self._target_index_list.append([maps.MAP_TARGET_POINT_INDICATOR, maps.MAP_TARGET_POINT_INDICATOR+1, maps.MAP_TARGET_POINT_INDICATOR+2])
+        self._taken_index_list.append([])
+        self._observed_object_ci.append([0, 0, 0])
+        self._dis_pre.append(-1)
+        
+        observation = self.env.reset()
         batch = batch_obs(observations, device=self.device)
 
         current_episode_reward = torch.zeros(

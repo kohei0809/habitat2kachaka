@@ -70,38 +70,7 @@ class BaseRLTrainerOracle(BaseTrainer):
         Returns:
             None
         """
-        self.device = (
-            torch.device("cuda", self.config.TORCH_GPU_ID)
-            if torch.cuda.is_available()
-            else torch.device("cpu")
-        )
-
-        if "disk" in self.config.VIDEO_OPTION:
-            assert (
-                len(self.config.VIDEO_DIR) > 0
-            ), "Must specify a directory for storing videos on disk"
-
-        if os.path.isfile(self.config.EVAL_CKPT_PATH_DIR):
-            # evaluate singe checkpoint
-            self._eval_checkpoint(self.config.EVAL_CKPT_PATH_DIR)
-        else:
-            # evaluate multiple checkpoints in order
-            prev_ckpt_ind = 81
-            while True:
-                current_ckpt = None
-                while current_ckpt is None:
-                    current_ckpt = poll_checkpoint_folder(
-                        self.config.EVAL_CKPT_PATH_DIR, prev_ckpt_ind
-                    )
-                    # time.sleep(2)   # sleep for 2 secs before polling again
-                logger.info(f"=======current_ckpt: {current_ckpt}=======")
-                prev_ckpt_ind += 1
-                self._eval_checkpoint(
-                    checkpoint_path=current_ckpt,
-                    log_manager=log_manager,
-                    date=date,
-                    checkpoint_index=prev_ckpt_ind,
-                )
+        raise NotImplementedError
 
     def _setup_eval_config(self, checkpoint_config: Config) -> Config:
         r"""Sets up and returns a merged config for evaluation. Config
