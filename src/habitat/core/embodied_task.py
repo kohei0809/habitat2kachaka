@@ -281,12 +281,17 @@ class EmbodiedTask:
 
     def reset(self, episode: Type[Episode]):
         self.currGoalIndex=0
+        
+        #############################################
+        # observationをセンサーに変える
+        raise NotImplementedError
         observations = self._sim.reset()
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations, episode=episode, task=self
             )
         )
+        #############################################
 
         for action_instance in self.actions.values():
             action_instance.reset(episode=episode, task=self)
@@ -307,6 +312,10 @@ class EmbodiedTask:
         observations = task_action.step(
             self, **action["action_args"], task=self
         )
+        
+        #############################################
+        # observationをセンサーに変える
+        raise NotImplementedError
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations,
@@ -315,6 +324,7 @@ class EmbodiedTask:
                 task=self,
             )
         )
+        #############################################
 
         self._is_episode_active = self._check_episode_is_active(
             observations=observations, action=action, episode=episode

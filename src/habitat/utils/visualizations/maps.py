@@ -273,6 +273,11 @@ def get_topdown_map(
         Image containing 0 if occupied, 1 if unoccupied, and 2 if border (if
         the flag is set).
     """
+    #############################
+    raise NotImplementedError
+    # mapについて
+    #############################
+    
     top_down_map = np.zeros(map_resolution, dtype=np.uint8)
     border_padding = 3
 

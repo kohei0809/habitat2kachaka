@@ -186,21 +186,3 @@ class MultiGoalSensor(Sensor):
             raise RuntimeError(
                 "Wrong GOAL_SPEC specified for ObjectGoalSensor."
             )
-
-
-@registry.register_task(name="MultiNav-v1")
-class MultiNavigationTask(NavigationTask):
-    r"""An Object Navigation Task class for a task specific methods.
-        Used to explicitly state a type of the task in config.
-    """
-    def __init__(
-        self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
-    ) -> None:
-        super().__init__(config=config, sim=sim, dataset=dataset)
-        self.currGoalIndex=0
-
-        
-    # def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:  
-    #     self.measurements.measures[
-    #         "success"
-    #     ].get_metric()

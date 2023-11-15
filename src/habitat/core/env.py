@@ -15,7 +15,7 @@ from gym.spaces.dict_space import Dict as SpaceDict
 from habitat import config
 
 from habitat.config import Config
-from habitat.core.dataset import Dataset, Episode, EpisodeIterator
+from habitat.core.dataset import Dataset, Episode
 from habitat.core.embodied_task import EmbodiedTask, Metrics
 from habitat.core.simulator import Observations, Simulator
 from habitat.datasets import make_dataset
@@ -54,7 +54,6 @@ class Env:
     _episodes: List[Type[Episode]]
     _current_episode_index: Optional[int]
     _current_episode: Optional[Type[Episode]]
-    _episode_iterator: Optional[Iterator]
     _sim: Simulator
     _task: EmbodiedTask
     _max_episode_seconds: int
@@ -101,9 +100,6 @@ class Env:
             for k, v in config.ENVIRONMENT.ITERATOR_OPTIONS.items()
         }
         iter_option_dict["seed"] = config.SEED
-        self._episode_iterator = self._dataset.get_episode_iterator(
-            **iter_option_dict
-        )
 
         # load the first scene if dataset is present
         if self._dataset:
@@ -153,14 +149,6 @@ class Env:
     @current_episode.setter
     def current_episode(self, episode: Type[Episode]) -> None:
         self._current_episode = episode
-
-    @property
-    def episode_iterator(self) -> Iterator:
-        return self._episode_iterator
-
-    @episode_iterator.setter
-    def episode_iterator(self, new_iter: Iterator) -> None:
-        self._episode_iterator = new_iter
 
     @property
     def episodes(self) -> List[Type[Episode]]:
@@ -248,8 +236,12 @@ class Env:
     
         assert len(self.episodes) > 0, "Episodes list is empty"
 
+        #############################################
+        # current_episodeについて
+        raise NotImplementedError
         self._current_episode = next(self._episode_iterator)
         self.reconfigure(self._config)
+        ############################################
             
         # Insert object here
         # ここは後で要変更
@@ -268,9 +260,14 @@ class Env:
         observations = self.task.reset(episode=self.current_episode)
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
+            #############################
+            # mapの取得
+            raise NotImplementedError
             self.currMap = np.copy(self.mapCache[self.current_episode.scene_id])
+            
             self.task.occMap = self.currMap[:,:,0]
             self.task.sceneMap = self.currMap[:,:,0]
+            #############################
 
 
         self._task.measurements.reset_measures(
@@ -299,22 +296,9 @@ class Env:
         if self._past_limit():
             self._episode_over = True
 
-        if self.episode_iterator is not None and isinstance(
-            self.episode_iterator, EpisodeIterator
-        ):
-            self.episode_iterator.step_taken()
-
     def step(
         self, action: Union[int, str, Dict[str, Any]], **kwargs
     ) -> Observations:
-        r"""Perform an action in the environment and return observations.
-
-        :param action: action (belonging to `action_space`) to be performed
-            inside the environment. Action is a name or index of allowed
-            task's action and action arguments (belonging to action's
-            `action_space`) to support parametrized and continuous actions.
-        :return: observations after taking action in environment.
-        """
 
         assert (
             self._episode_start_time is not None
@@ -370,6 +354,7 @@ class Env:
         return self._sim.render(mode)
 
     def close(self) -> None:
+        raise NotImplementedError
         self._sim.close()
 
 
@@ -468,20 +453,6 @@ class RLEnv(gym.Env):
 
         return observations, reward, done, info
 
-    #ci_map作成用
-    def step2(self, *args, **kwargs) -> Tuple[Observations, Any, bool, dict]:
-        r"""Perform an action in the environment.
-
-        :return: :py:`(observations, reward, done, info)`
-        """
-
-        reward = self.get_reward(None, **kwargs)
-        done = self.get_done(None)
-        info = self.get_info(None)
-
-        return reward, done, info
-    
-
     def seed(self, seed: Optional[int] = None) -> None:
         self._env.seed(seed)
 
@@ -489,4 +460,5 @@ class RLEnv(gym.Env):
         return self._env.render(mode)
 
     def close(self) -> None:
+        raise NotImplementedError
         self._env.close()

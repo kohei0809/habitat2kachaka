@@ -149,10 +149,6 @@ class InfoRLEnv(RLEnv):
         self._previous_action = kwargs["action"]
         return super().step(*args, **kwargs)
     
-    def step2(self, *args, **kwargs):
-        return super().step2(*args, **kwargs)
-    
-
     def get_reward_range(self):
         return (
             self._rl_config.SLACK_REWARD - 1.0,
