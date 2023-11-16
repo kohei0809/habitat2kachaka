@@ -318,7 +318,7 @@ _C.TASK.ANSWER_ACCURACY.TYPE = "AnswerAccuracy"
 # SIMULATOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR = CN()
-_C.SIMULATOR.TYPE = "Sim-v0"
+_C.SIMULATOR.TYPE = "Real-v0"
 _C.SIMULATOR.ACTION_SPACE_CONFIG = "v0"
 _C.SIMULATOR.FORWARD_STEP_SIZE = 0.25  # in metres
 _C.SIMULATOR.SCENE = (

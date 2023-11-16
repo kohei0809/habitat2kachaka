@@ -4,6 +4,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import cv2
+import math
 
 from collections import OrderedDict
 from enum import Enum
@@ -15,6 +16,14 @@ from gym.spaces.dict_space import Dict as SpaceDict
 
 from habitat.config import Config
 from habitat.core.dataset import Episode
+from habitat.core.simulator import (
+    AgentState,
+    Config,
+    Observations,
+    SensorSuite,
+    ShortestPathPoint,
+    Simulator,
+)
 
 
 RGBSENSOR_DIMENSION = 3
@@ -46,93 +55,6 @@ def check_sim_obs(obs, sensor):
         "Observation corresponding to {} not present in "
         "simulator's observations".format(sensor.uuid)
     )
-    
-
-@attr.s(auto_attribs=True)
-class ActionSpaceConfiguration:
-    config: Config
-
-    def get(self):
-        raise NotImplementedError
-
-
-class SensorTypes(Enum):
-    r"""Enumeration of types of sensors.
-    """
-
-    NULL = 0
-    COLOR = 1
-    DEPTH = 2
-    NORMAL = 3
-    SEMANTIC = 4
-    PATH = 5
-    POSITION = 6
-    FORCE = 7
-    TENSOR = 8
-    TEXT = 9
-    MEASUREMENT = 10
-    HEADING = 11
-    TACTILE = 12
-    TOKEN_IDS = 13
-
-
-class Sensor:
-    r"""Represents a sensor that provides data from the environment to agent.
-
-    :data uuid: universally unique id.
-    :data sensor_type: type of Sensor, use SensorTypes enum if your sensor
-        comes under one of it's categories.
-    :data observation_space: ``gym.Space`` object corresponding to observation
-        of sensor.
-
-    The user of this class needs to implement the get_observation method and
-    the user is also required to set the below attributes:
-    """
-
-    uuid: str
-    config: Config
-    sensor_type: SensorTypes
-    observation_space: Space
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.config = kwargs["config"] if "config" in kwargs else None
-        self.uuid = self._get_uuid(*args, **kwargs)
-        self.sensor_type = self._get_sensor_type(*args, **kwargs)
-        self.observation_space = self._get_observation_space(*args, **kwargs)
-
-    def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
-        raise NotImplementedError
-
-    def _get_sensor_type(self, *args: Any, **kwargs: Any) -> SensorTypes:
-        raise NotImplementedError
-
-    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Space:
-        raise NotImplementedError
-
-    def get_observation(self) -> Any:
-        r"""
-        Returns:
-            current observation for Sensor.
-        """
-        raise NotImplementedError
-
-
-class Observations(dict):
-    r"""Dictionary containing sensor observations
-    """
-
-    def __init__(self, sensors: Dict[str, Sensor]) -> None:
-        """Constructor
-
-        :param sensors: list of sensors whose observations are fetched and
-            packaged.
-        """
-
-        data = [
-            (uuid, sensor.get_observation())
-            for uuid, sensor in sensors.items()
-        ]
-        super().__init__(data)
 
 
 class RGBSensor(Sensor):
@@ -255,7 +177,8 @@ class ShortestPathPoint:
     action: Optional[int] = None
 
 
-class RealWorld:
+@registry.register_simulator(name="Real-v0")
+class RealWorld(Simulator):
     # 実世界実験用のSimulatorクラス
     
     def __init__(self, config: Config) -> None:
@@ -341,24 +264,13 @@ class RealWorld:
     def reset(self) -> Observations:
         return self._sensor_suite.get_observations()
 
-    def step(self, action, *args, **kwargs) -> Observations:
-        # actionを受け取ってカチャカを動かす
-        sim_obs = self._sim.step(action)
-        observations = self._sensor_suite.get_observations()
-        return observations
-
-
     def seed(self, seed: int) -> None:
-        raise NotImplementedError
-
-    def reconfigure(self, config: Config) -> None:
-        raise NotImplementedError
+        return
 
     def geodesic_distance(
         self,
         position_a: List[float],
         position_b: Union[List[float], List[List[float]]],
-        episode: Optional[Episode] = None,
     ) -> float:
         r"""Calculates geodesic distance between two points.
 
@@ -371,92 +283,90 @@ class RealWorld:
             :p:`position_a` and :p:`position_b`, if no path is found between
             the points then `math.inf` is returned.
         """
-        raise NotImplementedError
+        x_a, y_a = position_a
+        x_b, y_b = position_b
+        distance = math.sqrt((x_a-x_b)*(x_a-x_b) + (y_a-y_b)*(y_a-y_b))
+        return distance
 
-    def get_agent_state(self, agent_id: int = 0):
-        r"""..
+    def get_agent_state(self, agent_id: int = 0) -> habitat_sim.AgentState:
+        assert agent_id == 0, "No support of multi agent in {} yet.".format(
+            self.__class__.__name__
+        )
+        return self._sim.get_agent(agent_id).get_state()
 
-        :param agent_id: id of agent.
-        :return: state of agent corresponding to :p:`agent_id`.
-        """
-        raise NotImplementedError
-
-    def get_observations_at(
+    def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
+        if agent_id is None:
+            agent_id = self.config.DEFAULT_AGENT_ID
+        agent_name = self.config.AGENTS[agent_id]
+        agent_config = getattr(self.config, agent_name)
+        return agent_config
+    
+    def set_agent_state(
         self,
         position: List[float],
         rotation: List[float],
+        agent_id: int = 0,
+        reset_sensors: bool = True,
+    ) -> bool:
+        r"""Sets agent state similar to initialize_agent, but without agents
+        creation. On failure to place the agent in the proper position, it is
+        moved back to its previous pose.
+
+        Args:
+            position: list containing 3 entries for (x, y, z).
+            rotation: list with 4 entries for (x, y, z, w) elements of unit
+                quaternion (versor) representing agent 3D orientation,
+                (https://en.wikipedia.org/wiki/Versor)
+            agent_id: int identification of agent from multiagent setup.
+            reset_sensors: bool for if sensor changes (e.g. tilt) should be
+                reset).
+
+        Returns:
+            True if the set was successful else moves the agent back to its
+            original pose and returns false.
+        """
+        agent = self._sim.get_agent(agent_id)
+        original_state = self.get_agent_state(agent_id)
+        new_state = self.get_agent_state(agent_id)
+        new_state.position = position
+        new_state.rotation = rotation
+
+        # NB: The agent state also contains the sensor states in _absolute_
+        # coordinates. In order to set the agent's body to a specific
+        # location and have the sensors follow, we must not provide any
+        # state for the sensors. This will cause them to follow the agent's
+        # body
+        new_state.sensor_states = dict()
+
+        agent.set_state(new_state, reset_sensors)
+
+        if not self._check_agent_position(position, agent_id):
+            agent.set_state(original_state, reset_sensors)
+            return False
+        return True
+    
+    def get_observations_at(
+        self,
+        position: Optional[List[float]] = None,
+        rotation: Optional[List[float]] = None,
         keep_agent_at_new_pose: bool = False,
     ) -> Optional[Observations]:
-        """Returns the observation.
+        current_state = self.get_agent_state()
+        if position is None or rotation is None:
+            success = True
+        else:
+            success = self.set_agent_state(
+                position, rotation, reset_sensors=False
+            )
 
-        :param position: list containing 3 entries for :py:`(x, y, z)`.
-        :param rotation: list with 4 entries for :py:`(x, y, z, w)` elements
-            of unit quaternion (versor) representing agent 3D orientation,
-            (https://en.wikipedia.org/wiki/Versor)
-        :param keep_agent_at_new_pose: If true, the agent will stay at the
-            requested location. Otherwise it will return to where it started.
-        :return:
-            The observations or :py:`None` if it was unable to get valid
-            observations.
-
-        """
-        raise NotImplementedError
-
-    def action_space_shortest_path(
-        self, source: AgentState, targets: List[AgentState], agent_id: int = 0
-    ) -> List[ShortestPathPoint]:
-        r"""Calculates the shortest path between source and target agent
-        states.
-
-        :param source: source agent state for shortest path calculation.
-        :param targets: target agent state(s) for shortest path calculation.
-        :param agent_id: id for agent (relevant for multi-agent setup).
-        :return: list of agent states and actions along the shortest path from
-            source to the nearest target (both included).
-        """
-        raise NotImplementedError
-
-    def get_straight_shortest_path_points(
-        self, position_a: List[float], position_b: List[float]
-    ) -> List[List[float]]:
-        r"""Returns points along the geodesic (shortest) path between two
-        points irrespective of the angles between the waypoints.
-
-        :param position_a: the start point. This will be the first point in
-            the returned list.
-        :param position_b: the end point. This will be the last point in the
-            returned list.
-        :return: a list of waypoints :py:`(x, y, z)` on the geodesic path
-            between the two points.
-        """
-
-        raise NotImplementedError
-
-    @property
-    def up_vector(self):
-        r"""The vector representing the direction upward (perpendicular to the
-        floor) from the global coordinate frame.
-        """
-        raise NotImplementedError
-
-    @property
-    def forward_vector(self):
-        r"""The forward direction in the global coordinate frame i.e. the
-        direction of forward movement for an agent with 0 degrees rotation in
-        the ground plane.
-        """
-        raise NotImplementedError
-
-    def render(self, mode: str = "rgb") -> Any:
-        raise NotImplementedError
-
-    def close(self) -> None:
-        raise NotImplementedError
-
-    def previous_step_collided(self) -> bool:
-        r"""Whether or not the previous step resulted in a collision
-
-        :return: :py:`True` if the previous step resulted in a collision,
-            :py:`False` otherwise
-        """
-        raise NotImplementedError
+        if success:
+            observations = self._sensor_suite.get_observations()
+            if not keep_agent_at_new_pose:
+                self.set_agent_state(
+                    current_state.position,
+                    current_state.rotation,
+                    reset_sensors=False,
+                )
+            return observations
+        else:
+            return None

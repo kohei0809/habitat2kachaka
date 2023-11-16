@@ -734,9 +734,6 @@ class TopDownMap(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "top_down_map"
 
-    def _check_valid_nav_point(self, point: List[float]):
-        self._sim.is_navigable(point)
-
     def get_original_map(self):
         top_down_map = maps.get_topdown_map(
             self._sim,
@@ -842,29 +839,6 @@ class TopDownMap(Measure):
                 except AttributeError:
                     pass
 
-    def _draw_shortest_path(
-        self, episode: Episode, agent_position: AgentState
-    ):
-        if self._config.DRAW_SHORTEST_PATH:
-            self._shortest_path_points = self._sim.get_straight_shortest_path_points(
-                agent_position, episode.goals[0].position
-            )
-            self._shortest_path_points = [
-                maps.to_grid(
-                    p[0],
-                    p[2],
-                    self._coordinate_min,
-                    self._coordinate_max,
-                    self._map_resolution,
-                )
-                for p in self._shortest_path_points
-            ]
-            maps.draw_path(
-                self._top_down_map,
-                self._shortest_path_points,
-                maps.MAP_SHORTEST_PATH_COLOR,
-                self.line_thickness,
-            )
 
     def reset_metric(self, *args: Any, episode, **kwargs: Any):
         self._step_count = 0
@@ -1035,9 +1009,6 @@ class PictureRangeMap(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "picture_range_map"
 
-    def _check_valid_nav_point(self, point: List[float]):
-        self._sim.is_navigable(point)
-
     def get_original_map(self):
         top_down_map = maps.get_topdown_map(
             self._sim,
@@ -1143,30 +1114,6 @@ class PictureRangeMap(Measure):
                     )
                 except AttributeError:
                     pass
-
-    def _draw_shortest_path(
-        self, episode: Episode, agent_position: AgentState
-    ):
-        if self._config.DRAW_SHORTEST_PATH:
-            self._shortest_path_points = self._sim.get_straight_shortest_path_points(
-                agent_position, episode.goals[0].position
-            )
-            self._shortest_path_points = [
-                maps.to_grid(
-                    p[0],
-                    p[2],
-                    self._coordinate_min,
-                    self._coordinate_max,
-                    self._map_resolution,
-                )
-                for p in self._shortest_path_points
-            ]
-            maps.draw_path(
-                self._top_down_map,
-                self._shortest_path_points,
-                maps.MAP_SHORTEST_PATH_COLOR,
-                self.line_thickness,
-            )
 
     def reset_metric(self, *args: Any, episode, **kwargs: Any):
         self._step_count = 0

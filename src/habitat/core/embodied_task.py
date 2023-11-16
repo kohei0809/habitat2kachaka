@@ -296,9 +296,6 @@ class EmbodiedTask:
             self, **action["action_args"], task=self
         )
         
-        #############################################
-        # observationをセンサーに変える
-        raise NotImplementedError
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations,
@@ -307,7 +304,7 @@ class EmbodiedTask:
                 task=self,
             )
         )
-        #############################################
+    
 
         self._is_episode_active = self._check_episode_is_active(
             observations=observations, action=action, episode=episode

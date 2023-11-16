@@ -1,12 +1,7 @@
 from habitat.core.registry import registry
 from habitat.core.simulator import Simulator
 
-# from habitat.sims.habitat_simulator.actions import (
-#     HabitatSimV1ActionSpaceConfiguration,
-# )
-
-
-def _try_register_habitat_sim():
+def _try_register_real_world():
     try:
         import habitat_sim
 
@@ -16,13 +11,9 @@ def _try_register_habitat_sim():
         habitat_sim_import_error = e
 
     if has_habitat_sim:
-        from habitat.sims.habitat_simulator.habitat_simulator import HabitatSim
-        from habitat.sims.habitat_simulator.actions import (
-            HabitatSimV1ActionSpaceConfiguration,
-        )
+        from habitat.sims.habitat_simulator.real_world import RealWorld
     else:
-
-        @registry.register_simulator(name="Sim-v0")
+        @registry.register_simulator(name="Real-v0")
         class HabitatSimImportError(Simulator):
             def __init__(self, *args, **kwargs):
                 raise habitat_sim_import_error
