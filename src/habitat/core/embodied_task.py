@@ -28,43 +28,14 @@ class Action:
     own state and reset when new episode starts.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        return
-
-    def reset(self, *args: Any, **kwargs: Any) -> None:
-        r"""Reset method is called from ``Env`` on each reset for each new
-        episode. Goal of the method is to reset ``Action``'s state for each
-        episode.
-        """
-        raise NotImplementedError
-
-    def step(self, *args: Any, **kwargs: Any) -> Observations:
-        r"""Step method is called from ``Env`` on each ``step``. Can call
-        simulator or task method, change task's state.
-
-        :param kwargs: optional parameters for the action, like distance/force.
-        :return: observations after taking action in the task, including ones
-            coming from a simulator.
-        """
-        raise NotImplementedError
-
-    @property
-    def action_space(self) -> Space:
-        r"""a current Action's action space.
-        """
-        raise NotImplementedError
-
-
-class SimulatorTaskAction(Action):
-    r"""
-    An ``EmbodiedTask`` action that is wrapping simulator action.
-    """
-
     def __init__(
         self, *args: Any, config: Config, sim: Simulator, **kwargs: Any
     ) -> None:
         self._config = config
         self._sim = sim
+        self._client = None
+        self._meter = config.FORWARD_STEP_SIZE
+        self._angle = config.TURN_ANGLE
 
     @property
     def action_space(self):
@@ -76,6 +47,9 @@ class SimulatorTaskAction(Action):
     def step(self, *args: Any, **kwargs: Any) -> Observations:
         r"""Step method is called from ``Env`` on each ``step``.
         """
+        raise NotImplementedError
+    
+    def set_client(self, client):
         raise NotImplementedError
 
 
@@ -234,6 +208,7 @@ class EmbodiedTask:
         self._config = config
         self._sim = sim
         self._dataset = dataset
+        self._client = None
 
         self.measurements = Measurements(
             self._init_entities(
@@ -255,11 +230,12 @@ class EmbodiedTask:
             entity_names=config.POSSIBLE_ACTIONS,
             register_func=registry.get_task_action,
             entities_config=self._config.ACTIONS,
+            client=self._client,
         )
         self._action_keys = list(self.actions.keys())
 
     def _init_entities(
-        self, entity_names, register_func, entities_config=None
+        self, entity_names, register_func, entities_config=None, client=None,
     ) -> OrderedDict:
         if entities_config is None:
             entities_config = self._config
@@ -277,7 +253,14 @@ class EmbodiedTask:
                 dataset=self._dataset,
                 task=self,
             )
+            entities[entity_name].set_client(client)
         return entities
+    
+    def set_client(client):
+        self._client = client
+        print("##################################")
+        print("CLIENT")
+        print(client)
 
     def reset(self, episode: Type[Episode]):
         self.currGoalIndex=0

@@ -42,6 +42,10 @@ from utils.log_manager import LogManager
 from utils.log_writer import LogWriter
 from habitat.utils.visualizations import fog_of_war, maps
 
+import kachaka_api
+sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
+
+
 
 def to_grid(coordinate_min, coordinate_max, global_map_size, position):
     grid_size = (coordinate_max - coordinate_min) / global_map_size
@@ -297,7 +301,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
             return False
         
 
-    def _exec_kachaka(self, log_manager, date) -> None:
+    def _exec_kachaka(self, log_manager, date, ip) -> None:
+        client = kachaka_api.KachakaApiClient(ip)
+        client.update_resolver()
+        
         #ログ出力設定
         self.log_manager = log_manager
         #time, reward
@@ -311,7 +318,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
             else torch.device("cpu")
         )
         
-
         if "disk" in self.config.VIDEO_OPTION:
             assert (
                 len(self.config.VIDEO_DIR) > 0
@@ -352,7 +358,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             config.freeze()
 
         logger.info(f"env config: {config}")
-        self.env = construct_env(config)
+        self.env = construct_env(config, client)
         self._setup_actor_critic_agent(ppo_cfg)
 
         self.agent.load_state_dict(ckpt_dict["state_dict"])

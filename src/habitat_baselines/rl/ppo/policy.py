@@ -15,65 +15,6 @@ from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import RGBCNNNonOracle, RGBCNNOracle, MapCNN
 from habitat_baselines.rl.models.projection import Projection
 
-class PolicyNonOracle(nn.Module):
-    def __init__(self, net, dim_actions):
-        super().__init__()
-        self.net = net
-        self.dim_actions = dim_actions
-
-        self.action_distribution = CategoricalNet(
-            self.net.output_size, self.dim_actions
-        )
-        self.critic = CriticHead(self.net.output_size)
-
-    def forward(self, *x):
-        raise NotImplementedError
-
-    def act(
-        self,
-        observations,
-        rnn_hidden_states,
-        global_map,
-        prev_actions,
-        masks,
-        deterministic=False,
-    ):
-        features, rnn_hidden_states, global_map = self.net(
-            observations, rnn_hidden_states, global_map, prev_actions, masks
-        )
-
-        distribution = self.action_distribution(features)
-        value = self.critic(features)
-
-        if deterministic:
-            action = distribution.mode()
-        else:
-            action = distribution.sample()
-
-        action_log_probs = distribution.log_probs(action)
-
-        return value, action, action_log_probs, rnn_hidden_states, global_map
-
-    def get_value(self, observations, rnn_hidden_states, global_map, prev_actions, masks):
-        features, _, _ = self.net(
-            observations, rnn_hidden_states, global_map, prev_actions, masks
-        )
-        return self.critic(features)
-
-    def evaluate_actions(
-        self, observations, rnn_hidden_states, global_map, prev_actions, masks, action
-    ):
-        features, rnn_hidden_states, global_map = self.net(
-            observations, rnn_hidden_states, global_map, prev_actions, masks, ev=1
-        )
-        distribution = self.action_distribution(features)
-        value = self.critic(features)
-
-        action_log_probs = distribution.log_probs(action)
-        distribution_entropy = distribution.entropy().mean()
-
-        return value, action_log_probs, distribution_entropy, rnn_hidden_states
-
 
 class PolicyOracle(nn.Module):
     def __init__(self, net, dim_actions):

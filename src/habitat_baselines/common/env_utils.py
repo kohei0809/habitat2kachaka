@@ -35,7 +35,7 @@ def make_env_fn(
     env.seed(config.TASK_CONFIG.SEED)
     return env
 
-def construct_env(config: Config) -> InfoRLEnv:
+def construct_env(config: Config, client) -> InfoRLEnv:
     dataset = make_dataset(config.TASK_CONFIG.DATASET.TYPE)
     """
     scenes = config.TASK_CONFIG.DATASET.CONTENT_SCENES
@@ -61,5 +61,5 @@ def construct_env(config: Config) -> InfoRLEnv:
 
     proc_config.freeze()
 
-    env = InfoRLEnv(proc_config, dataset)
+    env = InfoRLEnv(proc_config, dataset, client)
     return env

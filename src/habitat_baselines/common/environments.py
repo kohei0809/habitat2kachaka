@@ -115,7 +115,7 @@ class NavRLEnv(habitat.RLEnv):
     
 @baseline_registry.register_env(name="InfoRLEnv")
 class InfoRLEnv(RLEnv):
-    def __init__(self, config: Config, dataset: Optional[Dataset] = None):
+    def __init__(self, config: Config, dataset: Optional[Dataset] = None, client = None):
         self._config = config
         self._rl_config = config.RL
         self._core_env_config = config.TASK_CONFIG
@@ -128,7 +128,11 @@ class InfoRLEnv(RLEnv):
         self._previous_distance = None
         self._previous_action = None
         
+        self._client = client
+        
         super().__init__(self._core_env_config, dataset)
+        
+        self._task.set_client(self._client)
         
     def __enter__(self):
         return self

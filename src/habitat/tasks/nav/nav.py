@@ -10,13 +10,14 @@ import attr
 import numpy as np
 from gym import spaces
 import math
+import time
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
 from habitat.core.embodied_task import (
     EmbodiedTask,
     Measure,
-    SimulatorTaskAction,
+    Action,
 )
 from habitat.core.logging import logger
 from habitat.core.registry import registry
@@ -1422,42 +1423,76 @@ class EpisodeLength(Measure):
 
 
 @registry.register_task_action
-class MoveForwardAction(SimulatorTaskAction):
+class MoveForwardAction(Action):
     name: str = "MOVE_FORWARD"
 
     def step(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
         ``step``.
         """
-        task.is_found_called = False ##C
-        raise NotImplementedError
-        return self._sim.step(HabitatSimActions.MOVE_FORWARD)
+        task.is_found_called = False 
+        
+        pos = self._client.get_robot_pose()
+        x = pos.x
+        y = pos.y
+        theta_rad = pos.theta
+        theta_deg = math.degrees(theta_rad)
+        
+        delta_x = self._meter * math.cos(theta_rad)
+        delta_y = self._meter * math.sin(theta_rad)   
+        print("MOVE_FORWARD " + str(self._meter) + "[m]")
+        move(client, x+delta_x, y+delta_y, theta_rad)
+        time.sleep(2)
 
+        return self._sim.get_observations_at()
+
+    def set_client(self, client):
+        self._client = client
 
 @registry.register_task_action
-class TurnLeftAction(SimulatorTaskAction):
+class TurnLeftAction(Action):
     def step(self, *args: Any,  task: EmbodiedTask, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
         ``step``.
         """
-        task.is_found_called = False ##C
-        raise NotImplementedError
-        return self._sim.step(HabitatSimActions.TURN_LEFT)
+        task.is_found_called = False 
+        
+        pos = self._client.get_robot_pose()
+        x = pos.x
+        y = pos.y
+        theta_rad = pos.theta
+        theta_deg = math.degrees(theta_rad)
+        angle = math.radians(self._angle)
+        print("TURN_LEFT " + str(self._angle) + "[度]")
+        move(client, x, y, theta_rad+angle)
+        time.sleep(2)
+        
+        return self._sim.get_observations_at()
 
 
 @registry.register_task_action
-class TurnRightAction(SimulatorTaskAction):
+class TurnRightAction(Action):
     def step(self, *args: Any,  task: EmbodiedTask, **kwargs: Any):
         r"""Update ``_metric``, this method is called from ``Env`` on each
         ``step``.
         """
-        task.is_found_called = False ##C
-        raise NotImplementedError
-        return self._sim.step(HabitatSimActions.TURN_RIGHT)
+        task.is_found_called = False
+        
+        pos = self._client.get_robot_pose()
+        x = pos.x
+        y = pos.y
+        theta_rad = pos.theta
+        theta_deg = math.degrees(theta_rad)
+        angle = math.radians(-self._angle)
+        print("TURN_RIGHT " + str(-self._angle) + "[度]")
+        move(client, x, y, theta_rad+angle)
+        time.sleep(2)
+        
+        return self._sim.get_observations_at()
 
 
 @registry.register_task_action
-class TakePicture(SimulatorTaskAction):
+class TakePicture(Action):
     name: str = "TAKE_PICTURE"
 
     def reset(self, *args: Any, task: EmbodiedTask, **kwargs: Any):

@@ -80,7 +80,8 @@ def main():
             
         trainer.train(log_manager, start_date)
     elif run_type == "eval":
-        trainer._exec_kachaka(log_manager, start_date)
+        ip = "192.168.100.37"
+        trainer._exec_kachaka(log_manager, start_date, ip)
        
     end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
     print("Start at " + start_date)

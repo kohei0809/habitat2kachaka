@@ -11,7 +11,7 @@ from habitat.core.embodied_task import EmbodiedTask, Measure, Measurements
 from habitat.core.env import Env, RLEnv
 from habitat.core.logging import logger
 from habitat.core.registry import registry
-from habitat.core.simulator import Sensor, SensorSuite, SensorTypes, Simulator
+from habitat.core.real_world import Sensor, SensorSuite, SensorTypes, RealWorld
 from habitat.datasets import make_dataset
 from habitat.version import VERSION as __version__  # noqa
 
@@ -26,9 +26,9 @@ __all__ = [
     "make_dataset",
     "Measure",
     "Measurements",
+    "RealWorld",
     "RLEnv",
     "Sensor",
     "SensorSuite",
     "SensorTypes",
-    "Simulator",
 ]
