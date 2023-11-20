@@ -37,6 +37,8 @@ lib64/
 parts/
 sdist/
 var/
+habitat-lab/
+habitat-sim
 
 *.egg-info/
 .installed.cfg
