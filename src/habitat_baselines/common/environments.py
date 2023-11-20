@@ -130,7 +130,7 @@ class InfoRLEnv(RLEnv):
         
         self._client = client
         
-        super().__init__(self._core_env_config, dataset)
+        super().__init__(self._core_env_config, dataset, client)
         
         self._task.set_client(self._client)
         

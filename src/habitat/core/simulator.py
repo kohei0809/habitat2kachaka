@@ -94,6 +94,54 @@ class Observations(dict):
         ]
         super().__init__(data)
         
+        
+class SensorSuite:
+    r"""Represents a set of sensors, with each sensor being identified
+    through a unique id.
+    """
+
+    sensors: Dict[str, Sensor]
+    observation_spaces: SpaceDict
+
+    def __init__(self, sensors: Iterable[Sensor]) -> None:
+        """Constructor
+
+        :param sensors: list containing sensors for the environment, uuid of
+            each sensor must be unique.
+        """
+        self.sensors = OrderedDict()
+        spaces: OrderedDict[str, Space] = OrderedDict()
+        for sensor in sensors:
+            assert (
+                sensor.uuid not in self.sensors
+            ), "'{}' is duplicated sensor uuid".format(sensor.uuid)
+            self.sensors[sensor.uuid] = sensor
+            spaces[sensor.uuid] = sensor.observation_space
+        self.observation_spaces = SpaceDict(spaces=spaces)
+
+    def get(self, uuid: str) -> Sensor:
+        return self.sensors[uuid]
+
+    def get_observations(self) -> Observations:
+        r"""Collects data from all sensors and returns it packaged inside
+            `Observations`.
+        """
+        return Observations(self.sensors)
+
+
+@attr.s(auto_attribs=True)
+class AgentState:
+    position: List[float]
+    rotation: Optional[List[float]] = None
+
+
+@attr.s(auto_attribs=True)
+class ShortestPathPoint:
+    position: List[Any]
+    rotation: List[Any]
+    action: Optional[int] = None
+
+        
 
 class Simulator:
     r"""Basic simulator class for habitat. New simulators to be added to habtiat
@@ -124,9 +172,6 @@ class Simulator:
         raise NotImplementedError
 
     def seed(self, seed: int) -> None:
-        raise NotImplementedError
-
-    def reconfigure(self, config: Config) -> None:
         raise NotImplementedError
 
     def geodesic_distance(

@@ -1058,7 +1058,6 @@ class PictureRangeMap(Measure):
 
     def _draw_goals_positions(self, episode):
         if self._config.DRAW_GOAL_POSITIONS:
-
             for i, goal in enumerate(episode.goals):
                 try:
                     self._draw_point(

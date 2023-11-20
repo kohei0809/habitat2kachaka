@@ -14,7 +14,7 @@ import numpy as np
 import torch
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.config.default import get_config    
-from utils.log_manager import LogManager
+#from utils.log_manager import LogManager
 
 def main():
     exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
@@ -60,8 +60,8 @@ def main():
     trainer = trainer_init(config)
     
     #ログファイルの設定   
-    log_manager = LogManager()
-    log_manager.setLogDirectory("./log/" + start_date + "/" + run_type)
+    #log_manager = LogManager()
+    #log_manager.setLogDirectory("./log/" + start_date + "/" + run_type)
     
     device = (
         torch.device("cuda", config.TORCH_GPU_ID)
@@ -72,16 +72,10 @@ def main():
     print("device:" + str(device))
     print("-----------------------------------")
 
-    if run_type == "train":
-        #フォルダがない場合は、作成
-        p_dir = pathlib.Path(config.CHECKPOINT_FOLDER)
-        if not p_dir.exists():
-            p_dir.mkdir(parents=True)
-            
-        trainer.train(log_manager, start_date)
-    elif run_type == "eval":
-        ip = "192.168.100.37"
-        trainer._exec_kachaka(log_manager, start_date, ip)
+    
+    ip = "192.168.100.37"
+    trainer._exec_kachaka(start_date, ip)
+    #trainer._exec_kachaka(log_manager, start_date, ip)
        
     end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
     print("Start at " + start_date)

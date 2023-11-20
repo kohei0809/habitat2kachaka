@@ -12,7 +12,7 @@ from habitat.core.env import Env, RLEnv
 from habitat.core.logging import logger
 from habitat.core.registry import registry
 from habitat.core.simulator import Sensor, SensorSuite, SensorTypes, Simulator
-from habitat.core.real_world import RealWorld
+from habitat.sims.habitat_simulator.real_world import RealWorld
 from habitat.datasets import make_dataset
 from habitat.version import VERSION as __version__  # noqa
 

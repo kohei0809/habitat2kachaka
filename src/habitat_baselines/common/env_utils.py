@@ -10,7 +10,7 @@ from typing import Type, Union
 
 import habitat
 from habitat import Config, Env, RLEnv, make_dataset
-from environments import InfoRLEnv
+from habitat_baselines.common.environments import InfoRLEnv
 
 
 def make_env_fn(

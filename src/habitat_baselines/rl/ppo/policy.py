@@ -77,44 +77,6 @@ class CriticHead(nn.Module):
         return self.fc(x)
 
 
-class BaselinePolicyNonOracle(PolicyNonOracle):
-    def __init__(
-        self,
-        batch_size,
-        observation_space,
-        action_space,
-        goal_sensor_uuid,
-        device,
-        object_category_embedding_size,
-        previous_action_embedding_size,
-        use_previous_action,
-        egocentric_map_size,
-        global_map_size,
-        global_map_depth,
-        coordinate_min,
-        coordinate_max,
-        hidden_size=512,
-    ):
-        super().__init__(
-            BaselineNetNonOracle(
-                batch_size,
-                observation_space=observation_space,
-                hidden_size=hidden_size,
-                goal_sensor_uuid=goal_sensor_uuid,
-                device=device,
-                object_category_embedding_size=object_category_embedding_size,
-                previous_action_embedding_size=previous_action_embedding_size,
-                use_previous_action=use_previous_action,
-                egocentric_map_size=egocentric_map_size,
-                global_map_size=global_map_size,
-                global_map_depth=global_map_depth,
-                coordinate_min=coordinate_min,
-                coordinate_max=coordinate_max,
-            ),
-            action_space.n,
-        )
-        
-
 class ProposedPolicyOracle(PolicyOracle):
     def __init__(
         self,

@@ -217,29 +217,6 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
         depth_map = depth_map.astype(np.uint8)
         depth_map = np.stack([depth_map for _ in range(3)], axis=2)
         egocentric_view.append(depth_map)
-
-    #projected_features = cv2.resize(
-    #    projected_features,
-    #    depth_map.shape[:2],
-    #    interpolation=cv2.INTER_CUBIC,
-    #)
-    #projected_features /= np.max(projected_features)
-    #projected_features  = cv2.applyColorMap(np.uint8(255 * projected_features), cv2.COLORMAP_JET)
-    #egocentric_view.append(projected_features)
-    #
-    #egocentric_projection = cv2.resize(
-    #    egocentric_projection,
-    #    depth_map.shape[:2],
-    #    interpolation=cv2.INTER_CUBIC,
-    #)
-    #egocentric_view.append(egocentric_projection)
-    #
-    #global_map = cv2.resize(
-    #    global_map,
-    #    depth_map.shape[:2],
-    #    interpolation=cv2.INTER_CUBIC,
-    #)
-    #egocentric_view.append(global_map)
     
     assert (
         len(egocentric_view) > 0

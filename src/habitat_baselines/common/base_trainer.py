@@ -12,7 +12,6 @@ import torch
 
 from habitat import Config
 from habitat.core.logging import logger
-from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.common.utils import poll_checkpoint_folder
 
 
@@ -63,7 +62,8 @@ class BaseRLTrainerOracle(BaseTrainer):
     def train(self) -> None:
         raise NotImplementedError
 
-    def _exec_kachaka(self, log_manager, date) -> None:
+    #def _exec_kachaka(self, log_manager, date) -> None:
+    def _exec_kachaka(self, date) -> None:
         r"""Main method of trainer evaluation. Calls _eval_checkpoint() that
         is specified in Trainer class that inherits from BaseRLTrainer
 

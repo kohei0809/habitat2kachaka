@@ -14,13 +14,17 @@ import attr
 from gym import Space
 from gym.spaces.dict_space import Dict as SpaceDict
 
+import habitat_sim
 from habitat.config import Config
 from habitat.core.dataset import Episode
+from habitat.core.registry import registry
 from habitat.core.simulator import (
     AgentState,
     Config,
     Observations,
+    Sensor,
     SensorSuite,
+    SensorTypes,
     ShortestPathPoint,
     Simulator,
 )
@@ -129,52 +133,6 @@ class DepthSensor(Sensor):
         obs = np.random.rand(self.observation_space.shape)
         
         return obs
-
-class SensorSuite:
-    r"""Represents a set of sensors, with each sensor being identified
-    through a unique id.
-    """
-
-    sensors: Dict[str, Sensor]
-    observation_spaces: SpaceDict
-
-    def __init__(self, sensors: Iterable[Sensor]) -> None:
-        """Constructor
-
-        :param sensors: list containing sensors for the environment, uuid of
-            each sensor must be unique.
-        """
-        self.sensors = OrderedDict()
-        spaces: OrderedDict[str, Space] = OrderedDict()
-        for sensor in sensors:
-            assert (
-                sensor.uuid not in self.sensors
-            ), "'{}' is duplicated sensor uuid".format(sensor.uuid)
-            self.sensors[sensor.uuid] = sensor
-            spaces[sensor.uuid] = sensor.observation_space
-        self.observation_spaces = SpaceDict(spaces=spaces)
-
-    def get(self, uuid: str) -> Sensor:
-        return self.sensors[uuid]
-
-    def get_observations(self) -> Observations:
-        r"""Collects data from all sensors and returns it packaged inside
-            `Observations`.
-        """
-        return Observations(self.sensors)
-
-
-@attr.s(auto_attribs=True)
-class AgentState:
-    position: List[float]
-    rotation: Optional[List[float]] = None
-
-
-@attr.s(auto_attribs=True)
-class ShortestPathPoint:
-    position: List[Any]
-    rotation: List[Any]
-    action: Optional[int] = None
 
 
 @registry.register_simulator(name="Real-v0")

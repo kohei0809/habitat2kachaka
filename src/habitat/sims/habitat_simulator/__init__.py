@@ -1,5 +1,5 @@
 from habitat.core.registry import registry
-from habitat.core.simulator import Simulator
+from habitat.sims.habitat_simulator.real_world import RealWorld
 
 def _try_register_real_world():
     try:

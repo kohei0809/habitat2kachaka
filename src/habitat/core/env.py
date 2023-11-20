@@ -69,7 +69,7 @@ class Env:
         self.close()
 
     def __init__(
-        self, config: Config, dataset: Optional[Dataset] = None
+        self, config: Config, dataset: Optional[Dataset] = None, client = None
     ) -> None:
         """Constructor
 
@@ -95,11 +95,7 @@ class Env:
             )
         self._episodes = self._dataset.episodes if self._dataset else []
         self._current_episode = None
-        iter_option_dict = {
-            k.lower(): v
-            for k, v in config.ENVIRONMENT.ITERATOR_OPTIONS.items()
-        }
-        iter_option_dict["seed"] = config.SEED
+        self.client = client
 
         # load the first scene if dataset is present
         if self._dataset:
@@ -133,13 +129,6 @@ class Env:
         self._elapsed_steps = 0
         self._episode_start_time: Optional[float] = None
         self._episode_over = False
-        
-        if config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            with open('oracle_maps/map300.pickle', 'rb') as handle:
-                self.mapCache = pickle.load(handle)
-        if config.TRAINER_NAME == "oracle-ego":
-            for x,y in self.mapCache.items():
-                self.mapCache[x] += 1
 
     @property
     def current_episode(self) -> Type[Episode]:
@@ -238,13 +227,13 @@ class Env:
 
         #############################################
         # current_episodeについて
-        raise NotImplementedError
-        self._current_episode = next(self._episode_iterator)
-        self.reconfigure(self._config)
+        #raise NotImplementedError
+        #self._current_episode = next(self._episode_iterator)
         ############################################
             
         # Insert object here
         # ここは後で要変更
+        """
         raise NotImplementedError
         object_to_datset_mapping = {'cylinder_red':0, 'cylinder_green':1, 'cylinder_blue':2,
             'cylinder_yellow':3, 'cylinder_white':4, 'cylinder_pink':5, 'cylinder_black':6, 'cylinder_cyan':7
@@ -254,20 +243,27 @@ class Env:
             dataset_index = object_to_datset_mapping[current_goal]
             
             raise NotImplementedError
+            # オブジェクトの挿入
             ind = self._sim._sim.add_object(dataset_index)
             self._sim._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
+        """
 
         observations = self.task.reset(episode=self.current_episode)
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            #############################
             # mapの取得
-            raise NotImplementedError
-            self.currMap = np.copy(self.mapCache[self.current_episode.scene_id])
+            #raise NotImplementedError
+            self.currMap = self._get_map()
+            # 分割サイズ
+            chunk_size = map.width
+            # 分割
+            map_data = np.array(np.array_split(map_data, range(chunk_size, len(map_data), chunk_size), axis=0))
+            map_data = create_map(map_data)
+            map_data = resize_map(map_data)
             
-            self.task.occMap = self.currMap[:,:,0]
-            self.task.sceneMap = self.currMap[:,:,0]
-            #############################
+            self.currMap = map_data
+            self.task.occMap = self.currMap
+            self.task.sceneMap = self.currMap
 
 
         self._task.measurements.reset_measures(
@@ -289,6 +285,84 @@ class Env:
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
             observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
         return observations
+    
+    # kachaka用のマップ取得
+    def _get_map(self):
+        map = client.get_png_map()
+        map_img = Image.open(io.BytesIO(map.data))
+        data = map_img.getdata()
+        map_data = np.array(data)
+        
+    def create_map(map_data):
+        h = len(map_data)
+        w = len(map_data[0])
+        map = np.zeros((h, w))
+    
+        for i in range(h):
+            for j in range(w):
+                # 不可侵領域
+                if map_data[i][j][0] == 244:
+                    map[i][j] = 0
+                elif map_data[i][j][0] == 191:
+                    map[i][j] = 1
+                elif map_data[i][j][0] == 253:
+                    map[i][j] = 2
+                else:
+                    map[i][j] = -1
+                
+        return map
+                
+    def resize_map(map):
+        h = len(map)
+        w = len(map[0])
+        size = 3
+        resized_map = np.zeros((int(h/size), int(w/size)))
+    
+        # mapのresize
+        for i in range(len(resized_map)):
+            for j in range(len(resized_map[0])):
+                flag = False
+                num_0 = 0
+                num_2 = 0
+                for k in range(size):
+                    if flag == True:
+                        break
+                    if size*i+k >= h:
+                        break
+                    for l in range(size):
+                        if size*j+l >= w:
+                            break
+                        if map[size*i+k][size*j+l] == 1:
+                            resized_map[i][j] = 1
+                            flag = True
+                        elif map[size*i+k][size*j+l] == 0:
+                            num_0 += 1
+                        elif map[size*i+k][size*j+l] == 2:
+                            num_2 += 1
+                        
+                if flag == False:
+                    if num_0 > num_2:
+                        resized_map[i][j] = 0
+                    else:
+                        resized_map[i][j] = 2            
+        # borderをちゃんと作る
+        for i in range(len(resized_map)):
+            for j in range(len(resized_map[0])):
+                flag = False
+                if resized_map[i][j] == 2:
+                    for k in [-1, 1]:
+                        if flag == True:
+                            break
+                        if i+k < 0 or i+k >= len(resized_map):
+                            continue
+                        for l in [-1, 1]:
+                            if j+l < 0 or j+l >= len(resized_map[0]):
+                                continue
+                            if resized_map[i+k][j+l] == 0:
+                                resized_map[i][j] = 1
+                                flag = True
+                                break                  
+        return resized_map
 
     def _update_step_stats(self) -> None:
         self._elapsed_steps += 1
@@ -339,23 +413,13 @@ class Env:
         self._sim.seed(seed)
         self._task.seed(seed)
 
-    def reconfigure(self, config: Config) -> None:
-        self._config = config
-
-        self._config.defrost()
-        self._config.SIMULATOR = self._task.overwrite_sim_config(
-            self._config.SIMULATOR, self.current_episode
-        )
-        self._config.freeze()
-
-        self._sim.reconfigure(self._config.SIMULATOR)
-
     def render(self, mode="rgb") -> np.ndarray:
         return self._sim.render(mode)
 
     def close(self) -> None:
-        raise NotImplementedError
-        self._sim.close()
+        #raise NotImplementedError
+        #self._sim.close()
+        pass
 
 
 class RLEnv(gym.Env):
@@ -460,5 +524,6 @@ class RLEnv(gym.Env):
         return self._env.render(mode)
 
     def close(self) -> None:
-        raise NotImplementedError
-        self._env.close()
+        #raise NotImplementedError
+        #self._env.close()
+        pass

@@ -26,18 +26,18 @@ from torch.optim.lr_scheduler import LambdaLR
 from habitat import Config
 from habitat.core.logging import logger
 from habitat.utils.visualizations.utils import observations_to_image
-from habitat_baselines.common.base_trainer import BaseRLTrainerNonOracle, BaseRLTrainerOracle
+from habitat_baselines.common.base_trainer import BaseRLTrainerOracle
 from habitat_baselines.common.baseline_registry import baseline_registry
-from habitat_baselines.common.env_utils import construct_envs
+from habitat_baselines.common.env_utils import construct_env
 from habitat_baselines.common.environments import get_env_class
-from habitat_baselines.common.rollout_storage import RolloutStorageOracle, RolloutStorageNonOracle
+from habitat_baselines.common.rollout_storage import RolloutStorageOracle
 from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.common.utils import (
     batch_obs,
     generate_video,
     linear_decay,
 )
-from habitat_baselines.rl.ppo import PPONonOracle, PPOOracle, BaselinePolicyNonOracle, BaselinePolicyOracle, ProposedPolicyOracle
+from habitat_baselines.rl.ppo import PPONonOracle, PPOOracle, ProposedPolicyOracle
 from utils.log_manager import LogManager
 from utils.log_writer import LogWriter
 from habitat.utils.visualizations import fog_of_war, maps
@@ -301,7 +301,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
             return False
         
 
-    def _exec_kachaka(self, log_manager, date, ip) -> None:
+    #def _exec_kachaka(self, log_manager, date, ip) -> None:
+    def _exec_kachaka(self, date, ip) -> None:
         client = kachaka_api.KachakaApiClient(ip)
         client.update_resolver()
         
@@ -416,6 +417,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         pbar = tqdm.tqdm(total=self.config.TEST_EPISODE_COUNT)
         self.actor_critic.eval()
+        
+        
+        # カチャカにshelfをstartに連れていく
+        print("Get the shelf and Go to the Start")
+        client.move_shelf("S01", "L02")
+        
         while (
             len(stats_episodes) < self.config.TEST_EPISODE_COUNT
             and self.envs.num_envs > 0
