@@ -341,12 +341,12 @@ SIMULATOR_SENSOR.ORIENTATION = [0.0, 0.0, 0.0]  # Euler's angles
 # RGB SENSOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR.RGB_SENSOR = SIMULATOR_SENSOR.clone()
-_C.SIMULATOR.RGB_SENSOR.TYPE = "HabitatSimRGBSensor"
+_C.SIMULATOR.RGB_SENSOR.TYPE = "RealRGBSensor"
 # -----------------------------------------------------------------------------
 # DEPTH SENSOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR.DEPTH_SENSOR = SIMULATOR_SENSOR.clone()
-_C.SIMULATOR.DEPTH_SENSOR.TYPE = "HabitatSimDepthSensor"
+_C.SIMULATOR.DEPTH_SENSOR.TYPE = "RealDepthSensor"
 _C.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.0
 _C.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 10.0
 _C.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = True

@@ -86,16 +86,16 @@ def draw_fog_of_war_line(top_down_map, fog_of_war_mask, pt1, pt2):
     for pt in bresenham_supercover_line(pt1, pt2):
         x, y = pt
 
-        if x < 0 or x >= fog_of_war_mask.shape[0]:
+        if y < 0 or y >= fog_of_war_mask.shape[0]:
             break
 
-        if y < 0 or y >= fog_of_war_mask.shape[1]:
+        if x < 0 or x >= fog_of_war_mask.shape[1]:
             break
 
-        if top_down_map[x, y] == maps.MAP_INVALID_POINT:
+        if top_down_map[y, x] == maps.MAP_INVALID_POINT:
             break
 
-        fog_of_war_mask[x, y] = 1
+        fog_of_war_mask[y, x] = 1
 
 
 @numba.jit(nopython=True)

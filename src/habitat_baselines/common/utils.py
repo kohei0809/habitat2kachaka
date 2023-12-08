@@ -92,12 +92,13 @@ def batch_obs(
     """
     batch = defaultdict(list)
 
-    for obs in observations:
-        for sensor in obs:
-            if sensor == "semantic":
-                obs[sensor] = obs[sensor].astype(np.int64)     
+    for sensor in observations:
+        if sensor == "semantic":
+            observations[sensor] = observations[sensor].astype(np.int64)     
             
-            batch[sensor].append(_to_tensor(obs[sensor]))
+        #print(sensor)
+        #print(observations[sensor])
+        batch[sensor].append(_to_tensor(observations[sensor]))
 
     for sensor in batch:
         batch[sensor] = (
@@ -129,9 +130,12 @@ def poll_checkpoint_folder(
     models_paths = list(
         filter(os.path.isfile, glob.glob(checkpoint_folder + "/*"))
     )
+    #print("models_paths=" + str(models_paths))
     # models_paths.sort(key=os.path.getmtime)
     models_paths.sort(key = lambda x: int(x.split(".")[1]))
-    ind = previous_ckpt_ind + 1
+    #ind = previous_ckpt_ind + 1
+    ind = previous_ckpt_ind
+    #print("ind=" + str(ind) + ", models_paths=" + str(len(models_paths)))
     if ind < len(models_paths):
         return models_paths[ind]
     return None
@@ -182,10 +186,6 @@ def generate_video(
     if "disk" in video_option:
         assert video_dir is not None
         images_to_video(images, video_dir, video_name)
-    if "tensorboard" in video_option:
-        tb_writer.add_video_from_np_images(
-            f"episode{episode_id}", checkpoint_idx, images, fps=fps
-        )
 
 
 def quat_from_angle_axis(theta: float, axis: np.ndarray) -> np.quaternion:
@@ -200,13 +200,28 @@ def quat_from_angle_axis(theta: float, axis: np.ndarray) -> np.quaternion:
     return quaternion.from_rotation_vector(theta * axis)
 
 class to_grid():
-    def __init__(self, global_map_size, coordinate_min, coordinate_max):
-        self.global_map_size = global_map_size
-        self.coordinate_min = coordinate_min
-        self.coordinate_max = coordinate_max
-        self.grid_size = (coordinate_max - coordinate_min) / global_map_size
+    def __init__():
+        pass
 
-    def get_grid_coords(self, positions):
-        grid_x = ((self.coordinate_max - positions[:, 0]) / self.grid_size).round()
-        grid_y = ((positions[:, 1] - self.coordinate_min) / self.grid_size).round()
+    def get_grid_coords(self, client, realworld_x, realworld_y):
+        map = client.get_png_map()
+        grid_resolution = map.resolution
+        
+        # マップの原点からエージェントまでの距離を算出
+        dx = realworld_x - map.origin.x
+        dy = realworld_y - map.origin.y
+        
+        # エージェントのグリッド座標を求める
+        grid_x = dx / map.resolution
+        grid_y = dy / map.resolution
+        grid_y = map.height-grid_y
+        
+        # resizeの分、割る
+        grid_x /= 3
+        grid_y /= 3
+        
+        # 四捨五入する
+        grid_x = int(grid_x)
+        grid_y = int(grid_y)
+        
         return grid_x, grid_y

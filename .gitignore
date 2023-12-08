@@ -206,3 +206,4 @@ o.*
 video_dir/
 log/
 result/
+*.pth

@@ -11,8 +11,6 @@ in habitat. Customized environments should be registered using
 """
 
 from typing import Optional, Type
-from utils.log_manager import LogManager
-from utils.log_writer import LogWriter
 import sys
 import numpy as np
 
@@ -132,7 +130,7 @@ class InfoRLEnv(RLEnv):
         
         super().__init__(self._core_env_config, dataset, client)
         
-        self._task.set_client(self._client)
+        self._env._task.set_client(self._client)
         
     def __enter__(self):
         return self
@@ -150,7 +148,8 @@ class InfoRLEnv(RLEnv):
         return observations
 
     def step(self, *args, **kwargs):
-        self._previous_action = kwargs["action"]
+        #print(kwargs)
+        #self._previous_action = kwargs["action"]
         return super().step(*args, **kwargs)
     
     def get_reward_range(self):
@@ -203,7 +202,7 @@ class InfoRLEnv(RLEnv):
 
         if self._take_picture():
             measure = self._env.get_metrics()[self._picture_measure_name]
-            ci, matrics = measure[0], measure[1]
+            ci = measure
             
         # area_rewardを足す
         area_reward = current_area - self._previous_area

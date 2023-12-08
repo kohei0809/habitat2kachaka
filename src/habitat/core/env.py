@@ -4,6 +4,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import io
 import time
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, Union
 import pickle
@@ -14,6 +15,9 @@ import numpy as np
 from gym.spaces.dict_space import Dict as SpaceDict
 from habitat import config
 
+from utils.log_manager import LogManager
+from utils.log_writer import LogWriter
+
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
 from habitat.core.embodied_task import EmbodiedTask, Metrics
@@ -21,7 +25,10 @@ from habitat.core.simulator import Observations, Simulator
 from habitat.datasets import make_dataset
 from habitat.sims import make_sim
 from habitat.tasks import make_task
+from habitat.tasks.nav.maximum_info_task import MaximumInformationTask
 from habitat_baselines.common.utils import quat_from_angle_axis
+from habitat.sims.habitat_simulator.real_world import RealWorld
+from habitat.utils.visualizations.maps import get_sem_map
 
 import matplotlib.pyplot as plt
 
@@ -98,6 +105,7 @@ class Env:
         self.client = client
 
         # load the first scene if dataset is present
+        """
         if self._dataset:
             assert (
                 len(self._dataset.episodes) > 0
@@ -105,11 +113,17 @@ class Env:
             self._config.defrost()
             self._config.SIMULATOR.SCENE = self._dataset.episodes[0].scene_id
             self._config.freeze()
-
+        """
+        """
         self._sim = make_sim(
             id_sim=self._config.SIMULATOR.TYPE, config=self._config.SIMULATOR
         )
-        self._task = make_task(
+        """
+        self._sim = RealWorld(config=self._config.SIMULATOR, client=client)
+        self._task = MaximumInformationTask(self._config.TASK, self._sim, client)
+        
+        
+        make_task(
             self._config.TASK.TYPE,
             config=self._config.TASK,
             sim=self._sim,
@@ -195,25 +209,27 @@ class Env:
         self._episode_over = False
     
 
-    def conv_grid(
-        self,
-        realworld_x,
-        realworld_y,
-        coordinate_min = -120.3241-1e-6,
-        coordinate_max = 120.0399+1e-6,
-        grid_resolution = (300, 300)
-    ):
-        r"""Return gridworld index of realworld coordinates assuming top-left corner
-        is the origin. The real world coordinates of lower left corner are
-        (coordinate_min, coordinate_min) and of top right corner are
-        (coordinate_max, coordinate_max)
-        """
-        grid_size = (
-            (coordinate_max - coordinate_min) / grid_resolution[0],
-            (coordinate_max - coordinate_min) / grid_resolution[1],
-        )
-        grid_x = int((coordinate_max - realworld_x) / grid_size[0])
-        grid_y = int((realworld_y - coordinate_min) / grid_size[1])
+    def conv_grid(self, realworld_x, realworld_y):
+        map = self.client.get_png_map()
+        grid_resolution = map.resolution
+        
+        # マップの原点からエージェントまでの距離を算出
+        dx = realworld_x - map.origin.x
+        dy = realworld_y - map.origin.y
+        
+        # エージェントのグリッド座標を求める
+        grid_x = dx / map.resolution
+        grid_y = dy / map.resolution
+        grid_y = map.height-grid_y
+        
+        # resizeの分、割る
+        grid_x /= 3
+        grid_y /= 3
+        
+        # 四捨五入する
+        grid_x = int(grid_x)
+        grid_y = int(grid_y)
+        
         return grid_x, grid_y
 
     def reset(self) -> Observations:
@@ -223,7 +239,7 @@ class Env:
         """
         self._reset_stats()
     
-        assert len(self.episodes) > 0, "Episodes list is empty"
+        #assert len(self.episodes) > 0, "Episodes list is empty"
 
         #############################################
         # current_episodeについて
@@ -248,121 +264,54 @@ class Env:
             self._sim._sim.set_translation(np.array(self.current_episode.goals[i].position), ind)
         """
 
-        observations = self.task.reset(episode=self.current_episode)
+        #observations = self.task.reset(episode=self.current_episode)
+        observations = self.task.reset()
+
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             # mapの取得
-            #raise NotImplementedError
-            self.currMap = self._get_map()
-            # 分割サイズ
-            chunk_size = map.width
-            # 分割
-            map_data = np.array(np.array_split(map_data, range(chunk_size, len(map_data), chunk_size), axis=0))
-            map_data = create_map(map_data)
-            map_data = resize_map(map_data)
-            
-            self.currMap = map_data
+            self.currMap  = get_sem_map(sim=self.sim, client=self.client)
             self.task.occMap = self.currMap
             self.task.sceneMap = self.currMap
+            self.task.set_top_down_map(self.currMap)
 
 
         self._task.measurements.reset_measures(
-            episode=self.current_episode, task=self.task
+            #episode=self.current_episode, task=self.task
+            task=self.task, client=self.client
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            robot_pose = self.client.get_robot_pose()
+            currPix = self.conv_grid(robot_pose.x, robot_pose.y)  ## Explored area marking
 
-            if self._config.TRAINER_NAME == "oracle-ego":
-                self.expose = np.repeat(
-                    self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
-                )
-                patch = self.currMap * self.expose
-            elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
+            self.expose = self.task.measurements.measures["fow_map"].get_metric()
+                
+            #print("EXPOSE: " + str(self.expose.shape))
+            #print("currMap: " + str(self.currMap.shape))
+            patch = self.currMap * self.expose
 
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40]
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
+            
+            
+            # padding
+            
+            #print("semMap: " + str(patch.shape))
+            patch_ = np.zeros((80, 80))
+            for i in range(patch.shape[0]): 
+                for j in range(patch.shape[1]):
+                    patch_[i][j] = patch[i][j]
+            #print("semMap_after: " + str(patch_.shape))
+            
+            #center_x = int(patch_.shape[0]/2)
+            #center_y = int(patch_.shape[1]/2)
+            center_x = 40
+            center_y = 40
+            
+            observations["semMap"] = patch_[center_x-25:center_x+25, center_y-25:center_y+25]
         return observations
     
-    # kachaka用のマップ取得
-    def _get_map(self):
-        map = client.get_png_map()
-        map_img = Image.open(io.BytesIO(map.data))
-        data = map_img.getdata()
-        map_data = np.array(data)
-        
-    def create_map(map_data):
-        h = len(map_data)
-        w = len(map_data[0])
-        map = np.zeros((h, w))
-    
-        for i in range(h):
-            for j in range(w):
-                # 不可侵領域
-                if map_data[i][j][0] == 244:
-                    map[i][j] = 0
-                elif map_data[i][j][0] == 191:
-                    map[i][j] = 1
-                elif map_data[i][j][0] == 253:
-                    map[i][j] = 2
-                else:
-                    map[i][j] = -1
-                
-        return map
-                
-    def resize_map(map):
-        h = len(map)
-        w = len(map[0])
-        size = 3
-        resized_map = np.zeros((int(h/size), int(w/size)))
-    
-        # mapのresize
-        for i in range(len(resized_map)):
-            for j in range(len(resized_map[0])):
-                flag = False
-                num_0 = 0
-                num_2 = 0
-                for k in range(size):
-                    if flag == True:
-                        break
-                    if size*i+k >= h:
-                        break
-                    for l in range(size):
-                        if size*j+l >= w:
-                            break
-                        if map[size*i+k][size*j+l] == 1:
-                            resized_map[i][j] = 1
-                            flag = True
-                        elif map[size*i+k][size*j+l] == 0:
-                            num_0 += 1
-                        elif map[size*i+k][size*j+l] == 2:
-                            num_2 += 1
-                        
-                if flag == False:
-                    if num_0 > num_2:
-                        resized_map[i][j] = 0
-                    else:
-                        resized_map[i][j] = 2            
-        # borderをちゃんと作る
-        for i in range(len(resized_map)):
-            for j in range(len(resized_map[0])):
-                flag = False
-                if resized_map[i][j] == 2:
-                    for k in [-1, 1]:
-                        if flag == True:
-                            break
-                        if i+k < 0 or i+k >= len(resized_map):
-                            continue
-                        for l in [-1, 1]:
-                            if j+l < 0 or j+l >= len(resized_map[0]):
-                                continue
-                            if resized_map[i+k][j+l] == 0:
-                                resized_map[i][j] = 1
-                                flag = True
-                                break                  
-        return resized_map
 
     def _update_step_stats(self) -> None:
         self._elapsed_steps += 1
@@ -385,26 +334,37 @@ class Env:
         if isinstance(action, str) or isinstance(action, (int, np.integer)):
             action = {"action": action}
 
-        observations = self.task.step(
-            action=action, episode=self.current_episode
-        )
+        observations = self.task.step(action=action)
 
         self._task.measurements.update_measures(
-            episode=self.current_episode, action=action, task=self.task
+           action=action, task=self.task
         )
 
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
-            currPix = self.conv_grid(observations["agent_position"][0], observations["agent_position"][2])  ## Explored area marking
+            robot_pose = self.client.get_robot_pose()
+            currPix = self.conv_grid(robot_pose.x, robot_pose.y)  ## Explored area marking
+            
             if self._config.TRAINER_NAME == "oracle-ego":
-                self.expose = np.repeat(
-                    self.task.measurements.measures["fow_map"].get_metric()[:, :, np.newaxis], 3, axis = 2
-                )
+                self.expose = self.task.measurements.measures["fow_map"].get_metric()
+                
                 patch = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
                 patch = self.currMap
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40,:]
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"][0] * 180/np.pi) + 90, order=0, reshape=False)
-            observations["semMap"] = patch[40-25:40+25, 40-25:40+25, :]
+            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40]
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
+            
+            patch_ = np.zeros((80, 80))
+            for i in range(patch.shape[0]): 
+                for j in range(patch.shape[1]):
+                    patch_[i][j] = patch[i][j]
+            #print("semMap_after: " + str(patch_.shape))
+            
+            #center_x = int(patch_.shape[0]/2)
+            #center_y = int(patch_.shape[1]/2)
+            center_x = 40
+            center_y = 40
+            
+            observations["semMap"] = patch_[center_x-25:center_x+25, center_y-25:center_y+25]
 
         self._update_step_stats()
         return observations
@@ -436,7 +396,7 @@ class RLEnv(gym.Env):
     _env: Env
 
     def __init__(
-        self, config: Config, dataset: Optional[Dataset] = None
+        self, config: Config, dataset: Optional[Dataset] = None, client=None
     ) -> None:
         """Constructor
 
@@ -444,7 +404,8 @@ class RLEnv(gym.Env):
         :param dataset: dataset to construct `Env`.
         """
         self._config = config
-        self._env = Env(config, dataset)
+        self._client = client
+        self._env = Env(config, dataset, client)
         self.observation_space = self._env.observation_space
         self.action_space = self._env.action_space
         self.reward_range = self.get_reward_range()

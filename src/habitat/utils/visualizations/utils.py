@@ -238,15 +238,17 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
             top_down_map, info["top_down_map"]["fog_of_war_mask"]
         )
         map_agent_pos = info["top_down_map"]["agent_map_coord"]
+        print("map_size: " + str(top_down_map.shape))
+        print("agent_pos: " + str(map_agent_pos))
         top_down_map = maps.draw_agent(
             image=top_down_map,
             agent_center_coord=map_agent_pos,
             agent_rotation=info["top_down_map"]["agent_angle"],
-            agent_radius_px=top_down_map.shape[0] // 16,
+            agent_radius_px=top_down_map.shape[0] // 32,
         )
 
-        if top_down_map.shape[0] > top_down_map.shape[1]:
-            top_down_map = np.rot90(top_down_map, 1)
+        #if top_down_map.shape[0] > top_down_map.shape[1]:
+        #    top_down_map = np.rot90(top_down_map, 1)
 
         # scale top down map to align with rgb view
         old_h, old_w, _ = top_down_map.shape

@@ -73,7 +73,7 @@ def main():
     print("-----------------------------------")
 
     
-    ip = "192.168.100.37"
+    ip = "192.168.100.37:26400"
     trainer._exec_kachaka(start_date, ip)
     #trainer._exec_kachaka(log_manager, start_date, ip)
        

@@ -286,6 +286,7 @@ class RGBCNNOracle(nn.Module):
         if self._n_input_rgb > 0:
             rgb_observations = observations["rgb"]
             # permute tensor to dimension [BATCH x CHANNEL x HEIGHT X WIDTH]
+            #print(rgb_observations.shape)
             rgb_observations = rgb_observations.permute(0, 3, 1, 2)
             rgb_observations = rgb_observations / 255.0  # normalize RGB
             cnn_input.append(rgb_observations)

@@ -166,10 +166,26 @@ if __name__ == "__main__":
     logmanager.setLogDirectory("./")
     writer = logmanager.createLogWriter("map")
     
+    client.set_auto_homing_enabled(False)
+    
+    client.move_shelf("S01", "L02")
+    
     map = client.get_png_map()
     print(map.name)
     print(map.resolution, map.width, map.height)
     print(map.origin)
+    robot_pose = client.get_robot_pose()
+    print(robot_pose)
+    
+    dx = robot_pose.x - map.origin.x
+    dy = robot_pose.y - map.origin.y
+    print("dx=" + str(dx) + ", dy=" + str(dy))
+    
+    grid_x = dx / map.resolution
+    grid_y = dy / map.resolution
+    grid_y = map.height-grid_y
+    print("grid_x=" + str(grid_x) + ", grid_y=" + str(grid_y))
+    
 
     map_img = Image.open(io.BytesIO(map.data))
     
@@ -186,12 +202,21 @@ if __name__ == "__main__":
     map_data = resize_map(map_data)
     print("resize: " + str(len(map_data)) + "," + str(len(map_data[0])))
     clipped_map = clip_map(map_data)
-    #clipped_map = map_data
+    clipped_map = map_data
     print("clip: " + str(len(clipped_map)) + "," + str(len(clipped_map[0])))
+    
+    grid_x /= 3
+    grid_x = round(grid_x)
+    grid_y /= 3
+    grid_y = round(grid_y)
+    print("grid_x=" + str(grid_x) + ", grid_y=" + str(grid_y))
 
     for i in range(len(clipped_map)):
         for j in range(len(clipped_map[0])):
-            writer.write(str(clipped_map[i][j]))
+            if i == grid_y and j == grid_x:
+                writer.write(str(5))
+            else:
+                writer.write(str(clipped_map[i][j]))
         writer.writeLine()
     
     map_img.save("test.png")

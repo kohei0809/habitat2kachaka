@@ -7,9 +7,11 @@
 import os
 from typing import List, Optional, Tuple
 
+from PIL import Image
 import imageio
 import numpy as np
 import scipy.ndimage
+import io
 
 from habitat.core.simulator import Simulator
 from habitat.core.utils import try_cv2_import
@@ -92,119 +94,27 @@ def draw_agent(
     return image
 
 
-def pointnav_draw_target_birdseye_view(
-    agent_position: np.ndarray,
-    agent_heading: float,
-    goal_position: np.ndarray,
-    resolution_px: int = 800,
-    goal_radius: float = 0.2,
-    agent_radius_px: int = 20,
-    target_band_radii: Optional[List[float]] = None,
-    target_band_colors: Optional[List[Tuple[int, int, int]]] = None,
-) -> np.ndarray:
-    r"""Return an image of agent w.r.t. centered target location for pointnav
-    tasks.
-
-    Args:
-        agent_position: the agent's current position.
-        agent_heading: the agent's current rotation in radians. This can be
-            found using the HeadingSensor.
-        goal_position: the pointnav task goal position.
-        resolution_px: number of pixels for the output image width and height.
-        goal_radius: how near the agent needs to be to be successful for the
-            pointnav task.
-        agent_radius_px: 1/2 number of pixels the agent will be resized to.
-        target_band_radii: distance in meters to the outer-radius of each band
-            in the target image.
-        target_band_colors: colors in RGB 0-255 for the bands in the target.
-    Returns:
-        Image centered on the goal with the agent's current relative position
-        and rotation represented by an arrow. To make the rotations align
-        visually with habitat, positive-z is up, positive-x is left and a
-        rotation of 0 points upwards in the output image and rotates clockwise.
-    """
-    if target_band_radii is None:
-        target_band_radii = [20, 10, 5, 2.5, 1]
-    if target_band_colors is None:
-        target_band_colors = [
-            (47, 19, 122),
-            (22, 99, 170),
-            (92, 177, 0),
-            (226, 169, 0),
-            (226, 12, 29),
-        ]
-
-    assert len(target_band_radii) == len(
-        target_band_colors
-    ), "There must be an equal number of scales and colors."
-
-    goal_agent_dist = np.linalg.norm(agent_position - goal_position, 2)
-
-    goal_distance_padding = max(
-        2, 2 ** np.ceil(np.log(max(1e-6, goal_agent_dist)) / np.log(2))
-    )
-    movement_scale = 1.0 / goal_distance_padding
-    half_res = resolution_px // 2
-    im_position = np.full(
-        (resolution_px, resolution_px, 3), 255, dtype=np.uint8
-    )
-
-    # Draw bands:
-    for scale, color in zip(target_band_radii, target_band_colors):
-        if goal_distance_padding * 4 > scale:
-            cv2.circle(
-                im_position,
-                (half_res, half_res),
-                max(2, int(half_res * scale * movement_scale)),
-                color,
-                thickness=-1,
-            )
-
-    # Draw such that the agent being inside the radius is the circles
-    # overlapping.
-    cv2.circle(
-        im_position,
-        (half_res, half_res),
-        max(2, int(half_res * goal_radius * movement_scale)),
-        (127, 0, 0),
-        thickness=-1,
-    )
-
-    relative_position = agent_position - goal_position
-    # swap x and z, remove y for (x,y,z) -> image coordinates.
-    relative_position = relative_position[[2, 0]]
-    relative_position *= half_res * movement_scale
-    relative_position += half_res
-    relative_position = np.round(relative_position).astype(np.int32)
-
-    # Draw the agent
-    draw_agent(im_position, relative_position, agent_heading, agent_radius_px)
-
-    # Rotate twice to fix coordinate system to upwards being positive-z.
-    # Rotate instead of flip to keep agent rotations in sync with egocentric
-    # view.
-    im_position = np.rot90(im_position, 2)
-    return im_position
-
-
-def to_grid(
-    realworld_x: float,
-    realworld_y: float,
-    coordinate_min: float,
-    coordinate_max: float,
-    grid_resolution: Tuple[int, int],
-) -> Tuple[int, int]:
-    r"""Return gridworld index of realworld coordinates assuming top-left corner
-    is the origin. The real world coordinates of lower left corner are
-    (coordinate_min, coordinate_min) and of top right corner are
-    (coordinate_max, coordinate_max)
-    """
-    grid_size = (
-        (coordinate_max - coordinate_min) / grid_resolution[0],
-        (coordinate_max - coordinate_min) / grid_resolution[1],
-    )
-    grid_x = int((coordinate_max - realworld_x) / grid_size[0])
-    grid_y = int((realworld_y - coordinate_min) / grid_size[1])
+def to_grid(client, realworld_x, realworld_y) -> Tuple[int, int]:
+    map = client.get_png_map()
+    grid_resolution = map.resolution
+        
+    # マップの原点からエージェントまでの距離を算出
+    dx = realworld_x - map.origin.x
+    dy = realworld_y - map.origin.y
+        
+    # エージェントのグリッド座標を求める
+    grid_x = dx / map.resolution
+    grid_y = dy / map.resolution
+    grid_y = map.height-grid_y
+        
+    # resizeの分、割る
+    grid_x /= 3
+    grid_y /= 3
+        
+    # 四捨五入する
+    grid_x = int(grid_x)
+    grid_y = int(grid_y)
+        
     return grid_x, grid_y
 
 
@@ -228,34 +138,98 @@ def from_grid(
     realworld_y = coordinate_min + grid_y * grid_size[1]
     return realworld_x, realworld_y
 
+def resize_map(map):
+    h = len(map)
+    w = len(map[0])
+    size = 3
+    
+    resized_map = np.zeros((int(h/size), int(w/size)))
+    #print("h=" + str(h) + ", w=" + str(w) + ", h'=" + str(len(resized_map)) + ", w'=" + str(len(resized_map[0])))
 
-def _outline_border(top_down_map):
-    left_right_block_nav = (top_down_map[:, :-1] == 1) & (
-        top_down_map[:, :-1] != top_down_map[:, 1:]
-    )
-    left_right_nav_block = (top_down_map[:, 1:] == 1) & (
-        top_down_map[:, :-1] != top_down_map[:, 1:]
-    )
+    # mapのresize
+    for i in range(len(resized_map)):
+        for j in range(len(resized_map[0])):
+            flag = False
+            num_0 = 0
+            num_1 = 0
+            for k in range(size):
+                if flag == True:
+                    break
+                
+                if size*i+k >= h:
+                    break
+                
+                for l in range(size):
+                    if size*j+l >= w:
+                        break
+                    if map[size*i+k][size*j+l] == 2:
+                        resized_map[i][j] = 2
+                        flag = True
+                    elif map[size*i+k][size*j+l] == 0:
+                        num_0 += 1
+                    elif map[size*i+k][size*j+l] == 1:
+                        num_1 += 1
+                        
+            if flag == False:
+                if num_0 > num_1:
+                    resized_map[i][j] = 0
+                else:
+                    resized_map[i][j] = 1
+            
+    # borderをちゃんと作る
+    for i in range(len(resized_map)):
+        for j in range(len(resized_map[0])):
+            flag = False
+            if resized_map[i][j] == 1:
+                for k in [-1, 1]:
+                    if flag == True:
+                        break
+                    if i+k < 0 or i+k >= len(resized_map):
+                        continue
+                    for l in [-1, 1]:
+                        if j+l < 0 or j+l >= len(resized_map[0]):
+                            continue
+                        if resized_map[i+k][j+l] == 0:
+                            resized_map[i][j] = 2
+                            flag = True
+                            break
+    return resized_map
+    
+def clip_map(map):
+    grid_delta = 3
+    range_x = np.where(np.any(map != 0, axis=0))[0]
+    range_y = np.where(np.any(map != 0, axis=1))[0]
+    
+    ind_x_min = range_x[0]
+    ind_x_max = range_x[-1]
+    ind_y_min = range_y[0]
+    ind_y_max = range_y[-1]
 
-    up_down_block_nav = (top_down_map[:-1] == 1) & (
-        top_down_map[:-1] != top_down_map[1:]
-    )
-    up_down_nav_block = (top_down_map[1:] == 1) & (
-        top_down_map[:-1] != top_down_map[1:]
-    )
-
-    top_down_map[:, :-1][left_right_block_nav] = MAP_BORDER_INDICATOR
-    top_down_map[:, 1:][left_right_nav_block] = MAP_BORDER_INDICATOR
-
-    top_down_map[:-1][up_down_block_nav] = MAP_BORDER_INDICATOR
-    top_down_map[1:][up_down_nav_block] = MAP_BORDER_INDICATOR
-
+    return map[ind_y_min - grid_delta : ind_y_max + grid_delta, ind_x_min - grid_delta : ind_x_max + grid_delta,].astype(int), ind_x_min, ind_x_max, ind_y_min, ind_y_max
+        
+def create_map(map_data):
+    h = len(map_data)
+    w = len(map_data[0])
+    map = np.zeros((h, w))
+    
+    for i in range(h):
+        for j in range(w):
+            # 不可侵領域
+            if map_data[i][j][0] == 244:
+                map[i][j] = 0
+            elif map_data[i][j][0] == 191:
+                map[i][j] = 2
+            elif map_data[i][j][0] == 253:
+                map[i][j] = 1
+            else:
+                map[i][j] = -1
+                
+    return map
 
 def get_topdown_map(
     sim: Simulator,
     map_resolution: Tuple[int, int] = (1250, 1250),
-    num_samples: int = 20000,
-    draw_border: bool = True,
+    client = None
 ) -> np.ndarray:
     r"""Return a top-down occupancy map for a sim. Note, this only returns valid
     values for whatever floor the agent is currently on.
@@ -273,73 +247,99 @@ def get_topdown_map(
         Image containing 0 if occupied, 1 if unoccupied, and 2 if border (if
         the flag is set).
     """
-    #############################
-    raise NotImplementedError
-    # mapについて
-    #############################
     
-    top_down_map = np.zeros(map_resolution, dtype=np.uint8)
-    border_padding = 3
+    map = client.get_png_map()
+    map_img = Image.open(io.BytesIO(map.data))
+    
+    data = map_img.getdata()
+    map_data = np.array(data) 
+    
+    # 分割サイズ
+    chunk_size = map.width
+    # 分割
+    map_data = np.array(np.array_split(map_data, range(chunk_size, len(map_data), chunk_size), axis=0))
+    
+    map_data = create_map(map_data)
+    map_data = resize_map(map_data)
+    top_down_map, ind_x_min, ind_x_max, ind_y_min, ind_y_max = clip_map(map_data)
+    """
+    ind_x_min=3
+    ind_x_max=0
+    ind_y_min=3
+    ind_y_max=0
+    top_down_map = map_data.astype(int)
+    """
+    
+    return top_down_map, ind_x_min, ind_x_max, ind_y_min, ind_y_max
 
-    start_height = sim.get_agent_state().position[1]
 
-    # Use sampling to find the extrema points that might be navigable.
-    range_x = (map_resolution[0], 0)
-    range_y = (map_resolution[1], 0)
-    for _ in range(num_samples):
-        point = sim.sample_navigable_point()
-        # Check if on same level as original
-        if np.abs(start_height - point[1]) > 0.5:
-            continue
-        g_x, g_y = to_grid(
-            point[0], point[2], COORDINATE_MIN, COORDINATE_MAX, map_resolution
-        )
-        range_x = (min(range_x[0], g_x), max(range_x[1], g_x))
-        range_y = (min(range_y[0], g_y), max(range_y[1], g_y))
+def get_sem_map(
+    sim: Simulator,
+    map_resolution: Tuple[int, int] = (1250, 1250),
+    client = None
+) -> np.ndarray:
+    map = client.get_png_map()
+    map_img = Image.open(io.BytesIO(map.data))
+    
+    data = map_img.getdata()
+    map_data = np.array(data) 
+    
+    # 分割サイズ
+    chunk_size = map.width
+    # 分割
+    map_data = np.array(np.array_split(map_data, range(chunk_size, len(map_data), chunk_size), axis=0))
+    
+    map_data = create_sem_map(map_data)
+    sem_map = resize_sem_map(map_data)
+    return sem_map
 
-    # Pad the range just in case not enough points were sampled to get the true
-    # extrema.
-    padding = int(np.ceil(map_resolution[0] / 125))
-    range_x = (
-        max(range_x[0] - padding, 0),
-        min(range_x[-1] + padding + 1, top_down_map.shape[0]),
-    )
-    range_y = (
-        max(range_y[0] - padding, 0),
-        min(range_y[-1] + padding + 1, top_down_map.shape[1]),
-    )
+def create_sem_map(map_data):
+    h = len(map_data)
+    w = len(map_data[0])
+    map = np.zeros((h, w))
+    
+    for i in range(h):
+        for j in range(w):
+            # 不可侵領域
+            if map_data[i][j][0] == 244:
+                map[i][j] = 2
+            elif map_data[i][j][0] == 191:
+                map[i][j] = 3
+            elif map_data[i][j][0] == 253:
+                map[i][j] = 3
+            else:
+                map[i][j] = -1
+                
+    return map
+    
+def resize_sem_map(map):
+    h = len(map)
+    w = len(map[0])
+    size = 3
+    resized_map = np.zeros((int(h/size), int(w/size)))
+    
+    # mapのresize
+    for i in range(len(resized_map)):
+        for j in range(len(resized_map[0])):
+            num_2 = 0
+            num_3 = 0
+            for k in range(size):
+                if size*i+k >= h:
+                    break
+                for l in range(size):
+                    if size*j+l >= w:
+                        break   
+                    if map[size*i+k][size*j+l] == 2:
+                        num_2 += 1
+                    elif map[size*i+k][size*j+l] == 3:
+                        num_3 += 1
 
-    # Search over grid for valid points.
-    for ii in range(range_x[0], range_x[1]):
-        for jj in range(range_y[0], range_y[1]):
-            realworld_x, realworld_y = from_grid(
-                ii, jj, COORDINATE_MIN, COORDINATE_MAX, map_resolution
-            )
-            valid_point = sim.is_navigable(
-                [realworld_x, start_height, realworld_y]
-            )
-            top_down_map[ii, jj] = (
-                MAP_VALID_POINT if valid_point else MAP_INVALID_POINT
-            )
-
-    # Draw border if necessary
-    if draw_border:
-        # Recompute range in case padding added any more values.
-        range_x = np.where(np.any(top_down_map, axis=1))[0]
-        range_y = np.where(np.any(top_down_map, axis=0))[0]
-        range_x = (
-            max(range_x[0] - border_padding, 0),
-            min(range_x[-1] + border_padding + 1, top_down_map.shape[0]),
-        )
-        range_y = (
-            max(range_y[0] - border_padding, 0),
-            min(range_y[-1] + border_padding + 1, top_down_map.shape[1]),
-        )
-
-        _outline_border(
-            top_down_map[range_x[0] : range_x[1], range_y[0] : range_y[1]]
-        )
-    return top_down_map
+            if num_2 > num_3:
+                resized_map[i][j] = 2
+            else:
+                resized_map[i][j] = 3            
+              
+    return resized_map
 
 
 def colorize_topdown_map(

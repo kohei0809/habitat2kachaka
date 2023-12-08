@@ -34,8 +34,6 @@ class Action:
         self._config = config
         self._sim = sim
         self._client = None
-        self._meter = config.FORWARD_STEP_SIZE
-        self._angle = config.TURN_ANGLE
 
     @property
     def action_space(self):
@@ -51,6 +49,9 @@ class Action:
     
     def set_client(self, client):
         raise NotImplementedError
+    
+    def set_top_down_map(self, map):
+        self._top_down_map = map
 
 
 class Measure:
@@ -75,6 +76,7 @@ class Measure:
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.uuid = self._get_uuid(*args, **kwargs)
         self._metric = None
+        self.client = None
 
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
         raise NotImplementedError
@@ -97,6 +99,9 @@ class Measure:
         :return: the current metric for `Measure`.
         """
         return self._metric
+    
+    def set_client(self, client):
+        self.client = client
 
 
 class Metrics(dict):
@@ -149,6 +154,10 @@ class Measurements:
         packaged inside `Metrics`.
         """
         return Metrics(self.measures)
+    
+    def set_client(self, client):
+        for measure in self.measures.values():
+            measure.set_client(client)
 
     def _get_measure_index(self, measure_name):
         return list(self.measures.keys()).index(measure_name)
@@ -203,12 +212,12 @@ class EmbodiedTask:
     sensor_suite: SensorSuite
 
     def __init__(
-        self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
+        self, config: Config, sim: Simulator, client=None, dataset: Optional[Dataset] = None
     ) -> None:
         self._config = config
         self._sim = sim
         self._dataset = dataset
-        self._client = None
+        self._client = client
 
         self.measurements = Measurements(
             self._init_entities(
@@ -217,6 +226,7 @@ class EmbodiedTask:
                 entities_config=config,
             ).values()
         )
+        self.measurements.set_client(client)
 
         self.sensor_suite = SensorSuite(
             self._init_entities(
@@ -232,6 +242,8 @@ class EmbodiedTask:
             entities_config=self._config.ACTIONS,
             client=self._client,
         )
+        #print("self.actions")
+        #print(self.actions)
         self._action_keys = list(self.actions.keys())
 
     def _init_entities(
@@ -244,6 +256,8 @@ class EmbodiedTask:
         for entity_name in entity_names:
             entity_cfg = getattr(entities_config, entity_name)
             entity_type = register_func(entity_cfg.TYPE)
+            if entity_type is None:
+                continue
             assert (
                 entity_type is not None
             ), f"invalid {entity_name} type {entity_cfg.TYPE}"
@@ -253,31 +267,37 @@ class EmbodiedTask:
                 dataset=self._dataset,
                 task=self,
             )
-            entities[entity_name].set_client(client)
+            """
+            if client is not None:
+                #print(entities[entity_name])
+                entities[entity_name].set_client(client)
+            """
         return entities
     
-    def set_client(client):
-        self._client = client
-        print("##################################")
-        print("CLIENT")
-        print(client)
+    def set_top_down_map(self, map):
+        for action_instance in self.actions.values():
+            action_instance.set_top_down_map(map)
 
-    def reset(self, episode: Type[Episode]):
+    def set_client(self, client):
+        self._client = client
+
+    def reset(self):
         self.currGoalIndex=0
         
         observations = self._sim.reset()
         observations.update(
             self.sensor_suite.get_observations(
-                observations=observations, episode=episode, task=self
+                observations=observations, task=self
             )
         )
 
         for action_instance in self.actions.values():
-            action_instance.reset(episode=episode, task=self)
+            action_instance.set_client(self._client)
+            action_instance.reset(task=self)
 
         return observations
 
-    def step(self, action: Union[int, Dict[str, Any]], episode: Type[Episode]):
+    def step(self, action: Union[int, Dict[str, Any]]):
         if "action_args" not in action or action["action_args"] is None:
             action["action_args"] = {}
         action_name = action["action"]
@@ -295,7 +315,6 @@ class EmbodiedTask:
         observations.update(
             self.sensor_suite.get_observations(
                 observations=observations,
-                episode=episode,
                 action=action,
                 task=self,
             )
@@ -303,7 +322,7 @@ class EmbodiedTask:
     
 
         self._is_episode_active = self._check_episode_is_active(
-            observations=observations, action=action, episode=episode
+            observations=observations, action=action
         )
 
         return observations
@@ -337,7 +356,6 @@ class EmbodiedTask:
         self,
         *args: Any,
         action: Union[int, Dict[str, Any]],
-        episode: Type[Episode],
         **kwargs: Any,
     ) -> bool:
         raise NotImplementedError

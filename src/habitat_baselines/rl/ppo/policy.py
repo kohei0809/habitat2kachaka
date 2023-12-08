@@ -150,7 +150,7 @@ class BaselineNetNonOracle(Net):
             device, coordinate_min, coordinate_max
         )
 
-        self.to_grid = to_grid(global_map_size, coordinate_min, coordinate_max)
+        self.to_grid = to_grid()
         self.rotate_tensor = RotateTensor(device)
 
         self.image_features_linear = nn.Linear(32 * 28 * 28, 512)
@@ -348,8 +348,8 @@ class BaselineNetOracle(Net):
             global_map_embedding = []
             global_map = observations['semMap']
             if self.agent_type == "oracle":
-                global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
-            global_map_embedding.append(self.object_embedding(global_map[:, :, :, 1].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
+                global_map_embedding.append(self.occupancy_embedding(global_map.type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
+            global_map_embedding.append(self.object_embedding(global_map.type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50, -1))
             global_map_embedding = torch.cat(global_map_embedding, dim=3)
             map_embed = self.map_encoder(global_map_embedding)
             x = [map_embed] + x
@@ -415,13 +415,13 @@ class ProposedNetOracle(Net):
             perception_embed = self.visual_encoder(observations)
             x = [perception_embed] + x
 
-        if self.agent_type != "no-map":
-            global_map_embedding = []
-            global_map = observations['semMap']
-            global_map_embedding.append(self.occupancy_embedding(global_map[:, :, :, 0].type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
-            global_map_embedding = torch.cat(global_map_embedding, dim=3)
-            map_embed = self.map_encoder(global_map_embedding)
-            x = [map_embed] + x
+        global_map_embedding = []
+        global_map = observations['semMap']
+        #print(global_map.shape)
+        global_map_embedding.append(self.occupancy_embedding(global_map.type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
+        global_map_embedding = torch.cat(global_map_embedding, dim=3)
+        map_embed = self.map_encoder(global_map_embedding)
+        x = [map_embed] + x
             
         if self.use_previous_action:
             x = torch.cat(x + [self.action_embedding(prev_actions).squeeze(1)], dim=1)

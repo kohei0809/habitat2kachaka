@@ -6,11 +6,14 @@
 
 from typing import Any, Dict, List, Optional, Type, Union
 
+import os
 import attr
 import numpy as np
 from gym import spaces
 import math
+import multiprocessing
 import time
+import threading
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
@@ -29,7 +32,6 @@ from habitat.core.simulator import (
     Simulator,
 )
 from habitat.core.utils import not_none_validator, try_cv2_import
-from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from habitat.tasks.utils import (
     cartesian_to_polar,
     quaternion_from_coeff,
@@ -61,6 +63,33 @@ def merge_sim_episode_config(
         agent_cfg.IS_SET_START_STATE = True
         agent_cfg.freeze()
     return sim_config
+
+
+def move(client, x, y, theta):
+    print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
+    
+    get_thread = threading.Thread(target=client.move_to_pose, args=(x, y, theta))
+    get_thread.start()
+    get_thread.join(10)  # get関数の終了を待つ（最大10秒）
+
+    if get_thread.is_alive():
+        print("move関数は10秒以上かかりました。強制終了します。")
+        client.speak("move関数は10秒以上かかりました。強制終了します。")
+    
+    #client.move_to_pose(x, y, theta)
+
+    result = client.get_last_command_result()[0]
+    if result.success:
+        #print("Success!")
+        pass
+    else:
+        with open(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
+            error_codes = json.load(f)
+        for error_code in error_codes:
+            if int(error_code["code"]) == result.error_code:
+                error_title = error_code["title"]
+                error_description = error_code["description"]
+                print(f"Failure: {error_title}\n{error_description}")
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -237,7 +266,7 @@ class IntegratedPointGoalGPSAndCompassSensor(PointGoalSensor):
         return "pointgoal_with_gps_compass"
 
     def get_observation(
-        self, *args: Any, observations, episode, **kwargs: Any
+        self, *args: Any, observations, **kwargs: Any
     ):
         agent_state = self._sim.get_agent_state()
         agent_position = agent_state.position
@@ -271,9 +300,9 @@ class AgentPositionSensor(Sensor):
         )
 
     def get_observation(
-        self, observations, *args: Any, episode, **kwargs: Any
+        self, observations, *args: Any, **kwargs: Any
     ):
-        return self._sim.get_agent_state().position
+        return self._sim.get_agent_state()["position"]
 
 
 @registry.register_sensor
@@ -309,13 +338,13 @@ class HeadingSensor(Sensor):
         return np.array([phi], dtype=np.float32)
 
     def get_observation(
-        self, observations, episode, *args: Any, **kwargs: Any
+        self, observations, *args: Any, **kwargs: Any
     ):
-        raise NotImplementedError
         agent_state = self._sim.get_agent_state()
-        rotation_world_agent = agent_state.rotation
+        rotation_world_agent = agent_state["rotation"]
 
-        return self._quat_to_xy_heading(rotation_world_agent.inverse())
+        #return self._quat_to_xy_heading(rotation_world_agent.inverse())
+        return rotation_world_agent
 
 
 @registry.register_sensor(name="CompassSensor")
@@ -328,15 +357,18 @@ class EpisodicCompassSensor(HeadingSensor):
         return "compass"
 
     def get_observation(
-        self, *args: Any, observations, episode, **kwargs: Any
+        self, *args: Any, observations, **kwargs: Any
     ):
         agent_state = self._sim.get_agent_state()
-        rotation_world_agent = agent_state.rotation
-        rotation_world_start = quaternion_from_coeff(episode.start_rotation)
+        rotation_world_agent = agent_state["rotation"]
+        rotation_world_start = rotation_world_agent
 
+        """
         return self._quat_to_xy_heading(
             rotation_world_agent.inverse() * rotation_world_start
         )
+        """
+        return rotation_world_agent
 
 
 @registry.register_sensor(name="GPSSensor")
@@ -375,24 +407,20 @@ class EpisodicGPSSensor(Sensor):
         )
 
     def get_observation(
-        self, *args: Any, observations, episode, **kwargs: Any
+        self, *args: Any, observations, **kwargs: Any
     ):
         agent_state = self._sim.get_agent_state()
-
-        origin = np.array(episode.start_position, dtype=np.float32)
-        rotation_world_start = quaternion_from_coeff(episode.start_rotation)
-
-        agent_position = agent_state.position
-
+        agent_position = agent_state["position"]
+        agent_rotation = agent_state["rotation"]
+        
+        origin = np.array(agent_position, dtype=np.float32)
+        rotation_world_start = agent_rotation
+        """
         agent_position = quaternion_rotate_vector(
             rotation_world_start.inverse(), agent_position - origin
         )
-        if self._dimensionality == 2:
-            return np.array(
-                [-agent_position[2], agent_position[0]], dtype=np.float32
-            )
-        else:
-            return agent_position.astype(np.float32)
+        """
+        return agent_position[0], agent_position[2]
 
 
 @registry.register_sensor
@@ -425,7 +453,7 @@ class ProximitySensor(Sensor):
         )
 
     def get_observation(
-        self, observations, *args: Any, episode, **kwargs: Any
+        self, observations, *args: Any, **kwargs: Any
     ):
         current_position = self._sim.get_agent_state().position
 
@@ -451,11 +479,11 @@ class Picture(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return self.cls_uuid
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
+        self.update_metric(*args, task=task, **kwargs)
 
     def update_metric(
-        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+        self, *args: Any, task: EmbodiedTask, **kwargs: Any
     ):
         if (
             hasattr(task, "is_found_called")
@@ -482,26 +510,27 @@ class CI(Measure):
         return self.cls_uuid
     
     def get_metric(self):
-        return self._metric, self._matrics
+        #return self._metric, self._matrics
+        return self._metric
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
         task.measurements.check_measure_dependencies(
             self.uuid, [Picture.cls_uuid]
         )
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
     
     def update_metric(
-        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+        self, *args: Any, task: EmbodiedTask, **kwargs: Any
     ):
         take_picture = task.measurements.measures[
             Picture.cls_uuid
         ].get_metric()
         
         observation = self._sim.get_observations_at()
-        semantic_obs = self._to_category_id(observation["semantic"])
-        H = semantic_obs.shape[0]
-        W = semantic_obs.shape[1]
-        self._matrics = np.zeros((H, W))
+        #semantic_obs = self._to_category_id(observation["semantic"])
+        #H = semantic_obs.shape[0]
+        #W = semantic_obs.shape[1]
+        #self._matrics = np.zeros((H, W))
         take_picture=True
         if take_picture:
             #measure = self._calCI()
@@ -600,15 +629,15 @@ class RawMetrics(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return self.cls_uuid
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
-        self._previous_position = self._sim.get_agent_state().position.tolist()
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
+        self._previous_position = self._sim.get_agent_state()["position"]
 
         self._start_end_episode_distance = 0
 
         self._agent_episode_distance = 0.0
         self._metric = None
 
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
         ##
 
     def _euclidean_distance(self, position_a, position_b):
@@ -616,11 +645,11 @@ class RawMetrics(Measure):
             np.array(position_b) - np.array(position_a), ord=2
         )
 
-    def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
-        current_position = self._sim.get_agent_state().position.tolist()
+    def update_metric(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
+        current_position = self._sim.get_agent_state()["position"]
         ###########################################
         # 距離について
-        raise NotImplementedError
+        #raise NotImplementedError
         self._agent_episode_distance += self._euclidean_distance(
             current_position, self._previous_position
         )
@@ -653,7 +682,7 @@ class STEPS(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "wpl"
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
         self._previous_position = self._sim.get_agent_state().position.tolist()
         raise NotImplementedError
         self._start_end_episode_distance = episode.info["geodesic_distance"]
@@ -661,7 +690,7 @@ class STEPS(Measure):
         task.measurements.check_measure_dependencies(
             self.uuid, [DistanceToGoal.cls_uuid]
         )
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
 
     def _euclidean_distance(self, position_a, position_b):
         return np.linalg.norm(
@@ -669,7 +698,7 @@ class STEPS(Measure):
         )
 
     def update_metric(
-        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+        self, *args: Any, task: EmbodiedTask, **kwargs: Any
     ):
         #############################################
         # 現在位置の取得
@@ -682,9 +711,12 @@ class STEPS(Measure):
 
         ###########################################
         # 距離について
+        """
         self._agent_episode_distance += self._euclidean_distance(
             current_position, self._previous_position
         )
+        """
+        self._agent_episode_distance = 0.0
         ##########################################
 
         self._previous_position = current_position
@@ -734,21 +766,14 @@ class TopDownMap(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "top_down_map"
 
-    def get_original_map(self):
-        top_down_map = maps.get_topdown_map(
+    def get_original_map(self, client=None):
+        top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
             self._map_resolution,
-            self._num_samples,
-            self._config.DRAW_BORDER,
+            client,        
         )
 
-        range_x = np.where(np.any(top_down_map, axis=1))[0]
-        range_y = np.where(np.any(top_down_map, axis=0))[0]
-
-        self._ind_x_min = range_x[0]
-        self._ind_x_max = range_x[-1]
-        self._ind_y_min = range_y[0]
-        self._ind_y_max = range_y[-1]
+        print("crip: x_in=" + str(self._ind_x_min) + ", x_max=" + str(self._ind_x_max) + ", y_min=" + str(self._ind_y_min) + ", y_max=" + str(self._ind_y_min))
 
         if self._config.FOG_OF_WAR.DRAW:
             self._fog_of_war_mask = np.zeros_like(top_down_map)
@@ -756,13 +781,7 @@ class TopDownMap(Measure):
         return top_down_map
 
     def _draw_point(self, position, point_type):
-        t_x, t_y = maps.to_grid(
-            position[0],
-            position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+        t_x, t_y = maps.to_grid(self.client, position[0], position[2])
         self._top_down_map[
             t_x - self.point_padding : t_x + self.point_padding + 1,
             t_y - self.point_padding : t_y + self.point_padding + 1,
@@ -820,13 +839,7 @@ class TopDownMap(Measure):
                     ]
 
                     map_corners = [
-                        maps.to_grid(
-                            p[0],
-                            p[2],
-                            self._coordinate_min,
-                            self._coordinate_max,
-                            self._map_resolution,
-                        )
+                        maps.to_grid(self.client, position[0], position[2])
                         for p in corners
                     ]
 
@@ -840,18 +853,12 @@ class TopDownMap(Measure):
                     pass
 
 
-    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+    def reset_metric(self, *args: Any, **kwargs: Any):
         self._step_count = 0
         self._metric = None
-        self._top_down_map = self.get_original_map()
-        agent_position = self._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+        self._top_down_map = self.get_original_map(kwargs["client"])
+        agent_position = self._sim.get_agent_state()["position"]
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])
         self._previous_xy_location = (a_y, a_x)
 
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
@@ -860,60 +867,60 @@ class TopDownMap(Measure):
         
         ##########################################
         # mapにオブジェクトの位置を記入する
+        """
         raise NotImplementedError
         self._draw_goals_view_points(episode)
         self._draw_goals_aabb(episode)
         self._draw_goals_positions(episode)
+        """
         ############################################
 
         ########################################
         # startの場所をmapに記入する
-        raise NotImplementedError
+        
         if self._config.DRAW_SOURCE:
             self._draw_point(
-                episode.start_position, maps.MAP_SOURCE_POINT_INDICATOR
+                agent_position, maps.MAP_SOURCE_POINT_INDICATOR
             )
             
         self.update_metric(None, None)
 
-    def _clip_map(self, _map):
-        return _map[
-            self._ind_x_min
-            - self._grid_delta : self._ind_x_max
-            + self._grid_delta,
-            self._ind_y_min
-            - self._grid_delta : self._ind_y_max
-            + self._grid_delta,
-        ]
-
-    def update_metric(self, episode, action, *args: Any, **kwargs: Any):
+    def update_metric(self, action, *args: Any, **kwargs: Any):
         self._step_count += 1
         house_map, map_agent_x, map_agent_y = self.update_map(
-            self._sim.get_agent_state().position
+            self._sim.get_agent_state()["position"]
         )
 
         # Rather than return the whole map which may have large empty regions,
         # only return the occupied part (plus some padding).
-        clipped_house_map = self._clip_map(house_map)
+        clipped_house_map = house_map
 
         clipped_fog_of_war_map = None
         if self._config.FOG_OF_WAR.DRAW:
-            clipped_fog_of_war_map = self._clip_map(self._fog_of_war_mask)
+            clipped_fog_of_war_map = self._fog_of_war_mask
+         
+        
+        print("agent_map_coord")
+        print("before: (" + str((map_agent_x - (self._ind_x_min - self._grid_delta))) + ", " + str(map_agent_y - (self._ind_y_min - self._grid_delta)) + ")")
+        print("after: (" + str(map_agent_x) + ", " + str(map_agent_y) + ")")
+        print("crip2: x_in=" + str(self._ind_x_min) + ", x_max=" + str(self._ind_x_max) + ", y_min=" + str(self._ind_y_min) + ", y_max=" + str(self._ind_y_max) + ", delta=" + str(self._grid_delta))
+        
 
         self._metric = {
             "map": clipped_house_map,
             "fog_of_war_mask": clipped_fog_of_war_map,
             "agent_map_coord": (
-                map_agent_x - (self._ind_x_min - self._grid_delta),
+                
                 map_agent_y - (self._ind_y_min - self._grid_delta),
+                map_agent_x - (self._ind_x_min - self._grid_delta),
             ),
-            "agent_angle": self.get_polar_angle(),
+            "agent_angle": self._sim.get_agent_state()["rotation"],
         }
 
     def get_polar_angle(self):
         agent_state = self._sim.get_agent_state()
         # quaternion is in x, y, z, w format
-        ref_rotation = agent_state.rotation
+        ref_rotation = agent_state["rotation"]
 
         heading_vector = quaternion_rotate_vector(
             ref_rotation.inverse(), np.array([0, 0, -1])
@@ -924,18 +931,8 @@ class TopDownMap(Measure):
         return np.array(phi) + x_y_flip
 
     def update_map(self, agent_position):
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
-        ##########################
-        raise NotImplementedError
-        # resolutionをどうするか
-        ##########################
-        
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])        
+        """
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
             color = 10 + min(
@@ -952,6 +949,7 @@ class TopDownMap(Measure):
                 color,
                 thickness=thickness,
             )
+        """
 
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
@@ -964,7 +962,8 @@ class TopDownMap(Measure):
                 self._top_down_map,
                 self._fog_of_war_mask,
                 agent_position,
-                self.get_polar_angle(),
+                #self.get_polar_angle(),
+                self._sim.get_agent_state()["rotation"],
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
                 * max(self._map_resolution)
@@ -1009,35 +1008,20 @@ class PictureRangeMap(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "picture_range_map"
 
-    def get_original_map(self):
-        top_down_map = maps.get_topdown_map(
+    def get_original_map(self, client=None):
+        top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
             self._map_resolution,
-            self._num_samples,
-            self._config.DRAW_BORDER,
+            client,
         )
-
-        range_x = np.where(np.any(top_down_map, axis=1))[0]
-        range_y = np.where(np.any(top_down_map, axis=0))[0]
-
-        self._ind_x_min = range_x[0]
-        self._ind_x_max = range_x[-1]
-        self._ind_y_min = range_y[0]
-        self._ind_y_max = range_y[-1]
-
+        
         if self._config.FOG_OF_WAR.DRAW:
             self._fog_of_war_mask = np.zeros_like(top_down_map)
 
         return top_down_map
 
     def _draw_point(self, position, point_type):
-        t_x, t_y = maps.to_grid(
-            position[0],
-            position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+        t_x, t_y = maps.to_grid(self.client, position[0], position[2])
         self._top_down_map[
             t_x - self.point_padding : t_x + self.point_padding + 1,
             t_y - self.point_padding : t_y + self.point_padding + 1,
@@ -1095,13 +1079,7 @@ class PictureRangeMap(Measure):
                     ]
 
                     map_corners = [
-                        maps.to_grid(
-                            p[0],
-                            p[2],
-                            self._coordinate_min,
-                            self._coordinate_max,
-                            self._map_resolution,
-                        )
+                        maps.to_grid(self.client, position[0], position[2])
                         for p in corners
                     ]
 
@@ -1114,86 +1092,53 @@ class PictureRangeMap(Measure):
                 except AttributeError:
                     pass
 
-    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+    def reset_metric(self, *args: Any, **kwargs: Any):
         self._step_count = 0
         self._metric = None
-        self._top_down_map = self.get_original_map()
-        agent_position = self._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+        self._top_down_map = self.get_original_map(kwargs["client"])
+        agent_position = self._sim.get_agent_state()["position"]
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])
         self._previous_xy_location = (a_y, a_x)
 
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
+        """
+        raise NotImplementedError
         if self._config.DRAW_SOURCE:
             self._draw_point(
                 episode.start_position, maps.MAP_SOURCE_POINT_INDICATOR
             )
+        """
             
         self.update_metric(None, None)
 
-    def _clip_map(self, _map):
-        return _map[
-            self._ind_x_min
-            - self._grid_delta : self._ind_x_max
-            + self._grid_delta,
-            self._ind_y_min
-            - self._grid_delta : self._ind_y_max
-            + self._grid_delta,
-        ]
 
-    def update_metric(self, episode, action, *args: Any, **kwargs: Any):
+    def update_metric(self, action, *args: Any, **kwargs: Any):
         self._step_count += 1
         house_map, map_agent_x, map_agent_y = self.update_map(
-            self._sim.get_agent_state().position
+            self._sim.get_agent_state()["position"]
         )
-        
-        raise NotImplementedError
 
         # Rather than return the whole map which may have large empty regions,
         # only return the occupied part (plus some padding).
-        clipped_house_map = self._clip_map(house_map)
+        clipped_house_map = house_map
 
         clipped_fog_of_war_map = None
         if self._config.FOG_OF_WAR.DRAW:
-            clipped_fog_of_war_map = self._clip_map(self._fog_of_war_mask)
+            clipped_fog_of_war_map = self._fog_of_war_mask
 
         self._metric = {
             "map": clipped_house_map,
             "fog_of_war_mask": clipped_fog_of_war_map,
             "agent_map_coord": (
-                map_agent_x - (self._ind_x_min - self._grid_delta),
                 map_agent_y - (self._ind_y_min - self._grid_delta),
+                map_agent_x - (self._ind_x_min - self._grid_delta),
             ),
-            "agent_angle": self.get_polar_angle(),
+            "agent_angle": self._sim.get_agent_state()["rotation"],
         }
 
-    def get_polar_angle(self):
-        agent_state = self._sim.get_agent_state()
-        # quaternion is in x, y, z, w format
-        ref_rotation = agent_state.rotation
-
-        heading_vector = quaternion_rotate_vector(
-            ref_rotation.inverse(), np.array([0, 0, -1])
-        )
-
-        phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-        x_y_flip = -np.pi / 2
-        return np.array(phi) + x_y_flip
-
     def update_map(self, agent_position):
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])
         """
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
@@ -1224,7 +1169,8 @@ class PictureRangeMap(Measure):
                 self._top_down_map,
                 np.zeros_like(self._top_down_map),
                 agent_position,
-                self.get_polar_angle(),
+                #self.get_polar_angle(),
+                self._sim.get_agent_state()["rotation"],
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
                 * max(self._map_resolution)
@@ -1250,29 +1196,23 @@ class FowMap(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "fow_map"
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
         self._metric = None
         self._top_down_map = task.sceneMap
         self._fog_of_war_mask = np.zeros_like(self._top_down_map)
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
 
-    def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
-        raise NotImplementedError
-        agent_position = self._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
+    def update_metric(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
+        agent_position = self._sim.get_agent_state()["position"]
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])
         agent_position = np.array([a_x, a_y])
 
         self._fog_of_war_mask = fog_of_war.reveal_fog_of_war(
             self._top_down_map,
             self._fog_of_war_mask,
             agent_position,
-            self.get_polar_angle(),
+            #self.get_polar_angle(),
+            self._sim.get_agent_state()["rotation"],
             fov=self._config.FOV,
             max_line_len=self._config.VISIBILITY_DIST
             * max(self._map_resolution)
@@ -1280,19 +1220,6 @@ class FowMap(Measure):
         )
 
         self._metric = self._fog_of_war_mask
-
-
-    def get_polar_angle(self):
-        agent_state = self._sim.get_agent_state()
-        # quaternion is in x, y, z, w format
-        ref_rotation = agent_state.rotation
-        heading_vector = quaternion_rotate_vector(
-            ref_rotation.inverse(), np.array([0, 0, -1])
-        )
-        phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-        x_y_flip = -np.pi / 2
-        return np.array(phi) + x_y_flip
-
 
 @registry.register_measure
 class DistanceToMultiGoal(Measure):
@@ -1312,24 +1239,28 @@ class DistanceToMultiGoal(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return self.cls_uuid
 
-    def reset_metric(self, episode, task, *args: Any, **kwargs: Any):
+    def reset_metric(self, task, *args: Any, **kwargs: Any):
         self._metric = None
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
 
-    def update_metric(self, episode, task, *args: Any, **kwargs: Any):
-        current_position = self._sim.get_agent_state().position.tolist()
+    def update_metric(self, task, *args: Any, **kwargs: Any):
+        current_position = self._sim.get_agent_state()["position"]
 
         if self._config.DISTANCE_TO == "POINT":
             distance_to_target = []
-            for goal_number in range(len(episode.goals)):
+            ###########################
+            for goal_number in range(3):
                 ########################################
                 # ２点間の距離についての関数を定義する
-                raise NotImplementedError
-            
+                #raise NotImplementedError
+                distance_to_target.append(0.0)
+                """
                 distance_to_target.append(self._sim.geodesic_distance(
                     current_position, episode.goals[goal_number].position
                 ))
+                """
                 ######################################
+            
         else:
             logger.error(
                 f"Non valid DISTANCE_TO parameter was provided: {self._config.DISTANCE_TO}"
@@ -1356,12 +1287,12 @@ class EpisodeLength(Measure):
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return self.cls_uuid
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
         self._episode_length = 0
         self._metric = self._episode_length
 
     def update_metric(
-        self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any
+        self, *args: Any, task: EmbodiedTask, **kwargs: Any
     ):
         self._episode_length += 1
         self._metric = self._episode_length
@@ -1387,13 +1318,15 @@ class MoveForwardAction(Action):
         delta_x = self._meter * math.cos(theta_rad)
         delta_y = self._meter * math.sin(theta_rad)   
         print("MOVE_FORWARD " + str(self._meter) + "[m]")
-        move(client, x+delta_x, y+delta_y, theta_rad)
-        time.sleep(2)
+        
+        move(self._client, x+delta_x, y+delta_y, theta_rad)
+        time.sleep(0.5)
 
         return self._sim.get_observations_at()
 
     def set_client(self, client):
         self._client = client
+        self._meter = 0.25
 
 @registry.register_task_action
 class TurnLeftAction(Action):
@@ -1410,10 +1343,14 @@ class TurnLeftAction(Action):
         theta_deg = math.degrees(theta_rad)
         angle = math.radians(self._angle)
         print("TURN_LEFT " + str(self._angle) + "[度]")
-        move(client, x, y, theta_rad+angle)
-        time.sleep(2)
+        move(self._client, x, y, theta_rad+angle)
+        time.sleep(0.5)
         
         return self._sim.get_observations_at()
+    
+    def set_client(self, client):
+        self._client = client
+        self._angle = 30
 
 
 @registry.register_task_action
@@ -1431,10 +1368,14 @@ class TurnRightAction(Action):
         theta_deg = math.degrees(theta_rad)
         angle = math.radians(-self._angle)
         print("TURN_RIGHT " + str(-self._angle) + "[度]")
-        move(client, x, y, theta_rad+angle)
-        time.sleep(2)
+        move(self._client, x, y, theta_rad+angle)
+        time.sleep(0.5)
         
         return self._sim.get_observations_at()
+    
+    def set_client(self, client):
+        self._client = client
+        self._angle = 30
 
 
 @registry.register_task_action
@@ -1450,12 +1391,32 @@ class TakePicture(Action):
         ``step``.
         """
         task.is_found_called = True
-        raise NotImplementedError
+        print("TAKE_PICTURE")
+        #self._client.speak("写真を撮りました。")
         return self._sim.get_observations_at()
+    
+    def set_client(self, client):
+        self._client = client
 
     
 @registry.register_task(name="Info-v0")
 class InformationTask(EmbodiedTask):
+    def __init__(
+        self, config: Config, sim: Simulator, client=None, dataset: Optional[Dataset] = None
+    ) -> None:
+        super().__init__(config=config, sim=sim, client=client, dataset=dataset)
+        
+    def overwrite_sim_config(
+        self, sim_config: Any, episode: Type[Episode]
+    ) -> Any:
+        return merge_sim_episode_config(sim_config, episode)
+
+    def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:
+        return not getattr(self, "is_stop_called", False)
+    
+    
+@registry.register_task(name="Nav-v0")
+class NavigationTask(EmbodiedTask):
     def __init__(
         self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
     ) -> None:

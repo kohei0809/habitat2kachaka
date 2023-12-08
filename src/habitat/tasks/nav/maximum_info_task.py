@@ -188,7 +188,7 @@ class MaximumInformationTask(InformationTask):
         Used to explicitly state a type of the task in config.
     """
     def __init__(
-        self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
+        self, config: Config, sim: Simulator, client = None, dataset: Optional[Dataset] = None
     ) -> None:
-        super().__init__(config=config, sim=sim, dataset=dataset)
+        super().__init__(config=config, sim=sim, client=client, dataset=dataset)
         self.currGoalIndex=0

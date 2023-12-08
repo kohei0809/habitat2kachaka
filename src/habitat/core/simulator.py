@@ -81,7 +81,7 @@ class Observations(dict):
     r"""Dictionary containing sensor observations
     """
 
-    def __init__(self, sensors: Dict[str, Sensor]) -> None:
+    def __init__(self, sensors: Dict[str, Sensor], *args: Any, **kwargs: Any) -> None:
         """Constructor
 
         :param sensors: list of sensors whose observations are fetched and
@@ -89,7 +89,7 @@ class Observations(dict):
         """
 
         data = [
-            (uuid, sensor.get_observation())
+            (uuid, sensor.get_observation(*args, **kwargs))
             for uuid, sensor in sensors.items()
         ]
         super().__init__(data)
@@ -122,11 +122,12 @@ class SensorSuite:
     def get(self, uuid: str) -> Sensor:
         return self.sensors[uuid]
 
-    def get_observations(self) -> Observations:
+    def get_observations(self, *args: Any, **kwargs: Any) -> Observations:
         r"""Collects data from all sensors and returns it packaged inside
             `Observations`.
         """
-        return Observations(self.sensors)
+        #print(self.sensors)
+        return Observations(self.sensors, *args, **kwargs)
 
 
 @attr.s(auto_attribs=True)
