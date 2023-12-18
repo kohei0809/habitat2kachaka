@@ -70,6 +70,7 @@ class RealRGBSensor(Sensor):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         #self.sim_sensor_type = habitat_sim.SensorType.COLOR
         self.cap = cv2.VideoCapture(0)
+        self.pre_obs = None
         super().__init__(*args, **kwargs)
         
     def __exit__(self):
@@ -91,13 +92,19 @@ class RealRGBSensor(Sensor):
         )
 
     def get_observation(self) -> Any:
-        ret, obs = self.cap.read()
+        _, obs = self.cap.read()
         
         size = self.observation_space.shape
-        #print(size[0:2])
-        obs = cv2.resize(obs, size[0:2])
-        obs[:, :, [0, 2]] = obs[:, :, [2, 0]]
         
+        if obs is None:
+            obs = self.pre_obs
+            print("Obs is None")
+        else:
+            obs[:, :, [0, 2]] = obs[:, :, [2, 0]]
+            
+        obs = cv2.resize(obs, size[0:2])
+                
+        self.pre_obs = obs
         return obs
 
 
@@ -139,6 +146,7 @@ class RealDepthSensor(Sensor):
         # あとで変更
         import numpy as np
         obs = np.random.rand(self.observation_space.shape[0], self.observation_space.shape[1], 1)
+        #obs = np.ones((self.observation_space.shape[0], self.observation_space.shape[1], 1))
         
         return obs
 
@@ -250,10 +258,10 @@ class RealWorld(Simulator):
         x = pos.x
         y = pos.y
         z = 0.0
-        theta_rad = pos.theta
+        theta_rad = pos.theta + math.pi/2
         theta_deg = math.degrees(theta_rad)
         
-        return {"position":[x, z, y], "rotation": theta_deg}
+        return {"position":[x, z, y], "rotation": theta_rad}
 
     def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
         if agent_id is None:

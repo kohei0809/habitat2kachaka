@@ -194,6 +194,93 @@ def resize_map(map):
                             flag = True
                             break
     return resized_map
+
+def recreate_map(map_data):
+    for i in range(map_data.shape[0]):
+        for j in range(map_data.shape[1]):
+            # 棚
+            if (i>=105 and i <= 154 and j>=26 and j <= 35):
+                map_data[i][j] = 0
+                
+            # 机の下
+            elif (i>=131 and i <= 193 and j>=53 and j <= 75):
+                map_data[i][j] = 0
+            elif (i>=105 and i <= 116 and j>=40 and j <= 51):
+                map_data[i][j] = 0
+            elif (i>=102 and i <= 112 and j>=56 and j <= 67):
+                map_data[i][j] = 0
+            elif (i>=101 and i <= 111 and j>=71 and j <= 83):
+                map_data[i][j] = 0
+            elif (i>=88 and i <= 106 and j>=83 and j <= 132):
+                map_data[i][j] = 0
+            elif (i>=107 and i <= 119 and j>=122 and j <= 130):
+                map_data[i][j] = 0
+                
+            # 配線
+            elif (i>=112 and i <= 130 and j>=64 and j <= 75):
+                map_data[i][j] = 0
+                
+            # 机の下&ホワイトボード
+            elif (i>=118 and i <= 137 and j>=89 and j <= 132):
+                map_data[i][j] = 0
+                
+            # ホワイトボード~机
+            elif (i>=119 and j>=108):
+                map_data[i][j] = 0
+            elif (i>=168 and i <= 201 and j>=94 and j <= 101):
+                map_data[i][j] = 0
+                
+            # ソファーを大きく
+            elif (i>=199 and i <= 201 and j>=97 and j <= 107):
+                map_data[i][j] = 0
+                
+            # 出入り口
+            elif (i>=186 and i <= 203 and j>=8 and j <= 31):
+                map_data[i][j] = 0
+            elif (i>=191 and i <= 203 and j>=6 and j <= 7):
+                map_data[i][j] = 0
+            elif (i>=189 and i <= 196 and j>=32 and j <= 41):
+                map_data[i][j] = 0
+            elif (i>=198 and i <= 200 and j>=32 and j <= 33):
+                map_data[i][j] = 0
+            elif (i>=224 and j>=24 and j <= 36):
+                map_data[i][j] = 0
+                
+            # 村田研究室ゾーン
+            elif i>=230:
+                map_data[i][j] = 0
+                
+            # 右端
+            elif j>=124:
+                map_data[i][j] = 0    
+            
+            # 細かいところ
+            elif (i>=103 and i <= 112 and j>=36 and j <= 53):
+                map_data[i][j] = 0
+            elif (i>=224 and i <= 230 and j>=44 and j <= 46):
+                map_data[i][j] = 0
+            elif (i <= 79):
+                map_data[i][j] = 0
+                
+    # 境界線をちゃんと作る
+    for i in range(map_data.shape[0]):
+        for j in range(map_data.shape[1]):
+            flag = False
+            if map_data[i][j] == 2:
+                for k in [-1, 1]:
+                    if flag == True:
+                        break
+                    if i+k < 0 or i+k >= map_data.shape[0]:
+                        continue
+                    for l in [-1, 1]:
+                        if j+l < 0 or j+l >= map_data.shape[1]:
+                            continue
+                        if map_data[i+k][j+l] == 0:
+                            map_data[i][j] = 2
+                            flag = True
+                            break
+                       
+    return map_data
     
 def clip_map(map):
     grid_delta = 3
@@ -205,7 +292,7 @@ def clip_map(map):
     ind_y_min = range_y[0]
     ind_y_max = range_y[-1]
 
-    return map[ind_y_min - grid_delta : ind_y_max + grid_delta, ind_x_min - grid_delta : ind_x_max + grid_delta,].astype(int), ind_x_min, ind_x_max, ind_y_min, ind_y_max
+    return ind_x_min, ind_x_max, ind_y_min, ind_y_max    
         
 def create_map(map_data):
     h = len(map_data)
@@ -261,14 +348,10 @@ def get_topdown_map(
     
     map_data = create_map(map_data)
     map_data = resize_map(map_data)
-    top_down_map, ind_x_min, ind_x_max, ind_y_min, ind_y_max = clip_map(map_data)
-    """
-    ind_x_min=3
-    ind_x_max=0
-    ind_y_min=3
-    ind_y_max=0
-    top_down_map = map_data.astype(int)
-    """
+    map_data = recreate_map(map_data)
+    ind_x_min, ind_x_max, ind_y_min, ind_y_max = clip_map(map_data)
+
+    top_down_map = map_data.astype(int)    
     
     return top_down_map, ind_x_min, ind_x_max, ind_y_min, ind_y_max
 
@@ -291,6 +374,7 @@ def get_sem_map(
     
     map_data = create_sem_map(map_data)
     sem_map = resize_sem_map(map_data)
+    sem_map = recreate_sem_map(sem_map)
     return sem_map
 
 def create_sem_map(map_data):
@@ -340,6 +424,75 @@ def resize_sem_map(map):
                 resized_map[i][j] = 3            
               
     return resized_map
+
+def recreate_sem_map(map_data):
+    for i in range(map_data.shape[0]):
+        for j in range(map_data.shape[1]):
+            # 棚
+            if (i>=105 and i <= 154 and j>=26 and j <= 35):
+                map_data[i][j] = 2
+                
+            # 机の下
+            elif (i>=131 and i <= 193 and j>=53 and j <= 75):
+                map_data[i][j] = 2
+            elif (i>=105 and i <= 116 and j>=40 and j <= 51):
+                map_data[i][j] = 2
+            elif (i>=102 and i <= 112 and j>=56 and j <= 67):
+                map_data[i][j] = 2
+            elif (i>=101 and i <= 111 and j>=71 and j <= 83):
+                map_data[i][j] = 2
+            elif (i>=88 and i <= 106 and j>=83 and j <= 132):
+                map_data[i][j] = 2
+            elif (i>=107 and i <= 119 and j>=122 and j <= 130):
+                map_data[i][j] = 2
+                
+            # 配線
+            elif (i>=112 and i <= 130 and j>=64 and j <= 75):
+                map_data[i][j] = 2
+                
+            # 机の下&ホワイトボード
+            elif (i>=118 and i <= 137 and j>=89 and j <= 132):
+                map_data[i][j] = 2
+                
+            # ホワイトボード~机
+            elif (i>=119 and j>=108):
+                map_data[i][j] = 2
+                
+            # ソファーを大きく
+            elif (i>=199 and i <= 201 and j>=97 and j <= 107):
+                map_data[i][j] = 2
+            elif (i>=168 and i <= 201 and j>=94 and j <= 101):
+                map_data[i][j] = 2
+                
+            # 出入り口
+            elif (i>=186 and i <= 203 and j>=8 and j <= 31):
+                map_data[i][j] = 2
+            elif (i>=191 and i <= 203 and j>=6 and j <= 7):
+                map_data[i][j] = 2
+            elif (i>=189 and i <= 196 and j>=32 and j <= 41):
+                map_data[i][j] = 2
+            elif (i>=198 and i <= 200 and j>=32 and j <= 33):
+                map_data[i][j] = 2
+            elif (i>=224 and j>=24 and j <= 36):
+                map_data[i][j] = 2
+                
+            # 村田研究室ゾーン
+            elif i>=230:
+                map_data[i][j] = 2
+                
+            # 右端
+            elif j>=124:
+                map_data[i][j] = 2  
+            
+            # 細かいところ
+            elif (i>=103 and i <= 112 and j>=36 and j <= 53):
+                map_data[i][j] = 2
+            elif (i>=224 and i <= 230 and j>=44 and j <= 46):
+                map_data[i][j] = 2
+            elif (i <= 79):
+                map_data[i][j] = 2
+                
+    return map_data
 
 
 def colorize_topdown_map(

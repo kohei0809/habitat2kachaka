@@ -291,7 +291,7 @@ class Env:
             #print("currMap: " + str(self.currMap.shape))
             patch = self.currMap * self.expose
 
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40]
+            patch = patch[currPix[1]-40:currPix[1]+40, currPix[0]-40:currPix[0]+40]
             patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
             
             
@@ -309,7 +309,7 @@ class Env:
             center_x = 40
             center_y = 40
             
-            observations["semMap"] = patch_[center_x-25:center_x+25, center_y-25:center_y+25]
+            observations["semMap"] = patch_[center_y-25:center_y+25, center_x-25:center_x+25]
         return observations
     
 
@@ -349,22 +349,34 @@ class Env:
                 
                 patch = self.currMap * self.expose
             elif self._config.TRAINER_NAME == "oracle":
-                patch = self.currMap
-            patch = patch[currPix[0]-40:currPix[0]+40, currPix[1]-40:currPix[1]+40]
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
+                patch = self.currMap   
+                
+            patch = patch[currPix[1]-40:currPix[1]+40, currPix[0]-40:currPix[0]+40]
+            #patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
+            patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) - 90, order=0, reshape=False)
             
+            """
             patch_ = np.zeros((80, 80))
             for i in range(patch.shape[0]): 
                 for j in range(patch.shape[1]):
                     patch_[i][j] = patch[i][j]
             #print("semMap_after: " + str(patch_.shape))
-            
+            """
             #center_x = int(patch_.shape[0]/2)
             #center_y = int(patch_.shape[1]/2)
             center_x = 40
             center_y = 40
             
-            observations["semMap"] = patch_[center_x-25:center_x+25, center_y-25:center_y+25]
+            #observations["semMap"] = patch_[center_x-25:center_x+25, center_y-25:center_y+25]
+            observations["semMap"] = patch[40-25:40+25, 40-25:40+25]
+            
+            log_manager = LogManager()
+            log_manager.setLogDirectory("semMap")
+            log_writer = log_manager.createLogWriter("semMap")
+            for i in range(observations["semMap"].shape[0]):
+                for j in range(observations["semMap"].shape[1]):
+                    log_writer.write(str(observations["semMap"][i][j]))
+                log_writer.writeLine()     
 
         self._update_step_stats()
         return observations

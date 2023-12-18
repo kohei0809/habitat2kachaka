@@ -14,6 +14,7 @@ import math
 import multiprocessing
 import time
 import threading
+import json
 
 from habitat.config import Config
 from habitat.core.dataset import Dataset, Episode
@@ -772,13 +773,17 @@ class TopDownMap(Measure):
             self._map_resolution,
             client,        
         )
-
-        print("crip: x_in=" + str(self._ind_x_min) + ", x_max=" + str(self._ind_x_max) + ", y_min=" + str(self._ind_y_min) + ", y_max=" + str(self._ind_y_min))
-
+        
         if self._config.FOG_OF_WAR.DRAW:
             self._fog_of_war_mask = np.zeros_like(top_down_map)
 
         return top_down_map
+    
+    def _clip_map(self, _map, fog=False):
+        return _map[
+            self._ind_y_min - self._grid_delta : self._ind_y_max + self._grid_delta,
+            self._ind_x_min - self._grid_delta : self._ind_x_max + self._grid_delta,
+        ]
 
     def _draw_point(self, position, point_type):
         t_x, t_y = maps.to_grid(self.client, position[0], position[2])
@@ -891,26 +896,19 @@ class TopDownMap(Measure):
             self._sim.get_agent_state()["position"]
         )
 
+        clipped_house_map = self._clip_map(house_map)
         # Rather than return the whole map which may have large empty regions,
         # only return the occupied part (plus some padding).
-        clipped_house_map = house_map
+        
 
-        clipped_fog_of_war_map = None
+        clipped_fog_of_war_mask = None
         if self._config.FOG_OF_WAR.DRAW:
-            clipped_fog_of_war_map = self._fog_of_war_mask
-         
-        
-        print("agent_map_coord")
-        print("before: (" + str((map_agent_x - (self._ind_x_min - self._grid_delta))) + ", " + str(map_agent_y - (self._ind_y_min - self._grid_delta)) + ")")
-        print("after: (" + str(map_agent_x) + ", " + str(map_agent_y) + ")")
-        print("crip2: x_in=" + str(self._ind_x_min) + ", x_max=" + str(self._ind_x_max) + ", y_min=" + str(self._ind_y_min) + ", y_max=" + str(self._ind_y_max) + ", delta=" + str(self._grid_delta))
-        
+            clipped_fog_of_war_mask = self._clip_map(self._fog_of_war_mask)
 
         self._metric = {
             "map": clipped_house_map,
-            "fog_of_war_mask": clipped_fog_of_war_map,
+            "fog_of_war_mask": clipped_fog_of_war_mask,
             "agent_map_coord": (
-                
                 map_agent_y - (self._ind_y_min - self._grid_delta),
                 map_agent_x - (self._ind_x_min - self._grid_delta),
             ),
@@ -931,7 +929,7 @@ class TopDownMap(Measure):
         return np.array(phi) + x_y_flip
 
     def update_map(self, agent_position):
-        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])        
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
         """
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
@@ -962,8 +960,7 @@ class TopDownMap(Measure):
                 self._top_down_map,
                 self._fog_of_war_mask,
                 agent_position,
-                #self.get_polar_angle(),
-                self._sim.get_agent_state()["rotation"],
+                -self._sim.get_agent_state()["rotation"]+math.pi/2,
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
                 * max(self._map_resolution)
@@ -1019,6 +1016,12 @@ class PictureRangeMap(Measure):
             self._fog_of_war_mask = np.zeros_like(top_down_map)
 
         return top_down_map
+    
+    def _clip_map(self, _map):
+        return _map[
+            self._ind_y_min - self._grid_delta : self._ind_y_max + self._grid_delta,
+            self._ind_x_min - self._grid_delta : self._ind_x_max + self._grid_delta,
+        ]
 
     def _draw_point(self, position, point_type):
         t_x, t_y = maps.to_grid(self.client, position[0], position[2])
@@ -1131,8 +1134,8 @@ class PictureRangeMap(Measure):
             "map": clipped_house_map,
             "fog_of_war_mask": clipped_fog_of_war_map,
             "agent_map_coord": (
-                map_agent_y - (self._ind_y_min - self._grid_delta),
-                map_agent_x - (self._ind_x_min - self._grid_delta),
+                map_agent_y,
+                map_agent_x,
             ),
             "agent_angle": self._sim.get_agent_state()["rotation"],
         }
@@ -1169,8 +1172,7 @@ class PictureRangeMap(Measure):
                 self._top_down_map,
                 np.zeros_like(self._top_down_map),
                 agent_position,
-                #self.get_polar_angle(),
-                self._sim.get_agent_state()["rotation"],
+                -self._sim.get_agent_state()["rotation"]+math.pi/2,
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
                 * max(self._map_resolution)
@@ -1188,9 +1190,9 @@ class FowMap(Measure):
     ):
         self._sim = sim
         self._config = config
-        self._map_resolution = (300, 300)
-        self._coordinate_min = -120.3241-1e-6
-        self._coordinate_max = 120.0399+1e-6
+        self._map_resolution = (1250, 1250)
+        self._coordinate_min = maps.COORDINATE_MIN
+        self._coordinate_max = maps.COORDINATE_MAX
         super().__init__()
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
@@ -1211,8 +1213,7 @@ class FowMap(Measure):
             self._top_down_map,
             self._fog_of_war_mask,
             agent_position,
-            #self.get_polar_angle(),
-            self._sim.get_agent_state()["rotation"],
+            -self._sim.get_agent_state()["rotation"]+math.pi/2,
             fov=self._config.FOV,
             max_line_len=self._config.VISIBILITY_DIST
             * max(self._map_resolution)

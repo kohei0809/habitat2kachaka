@@ -117,9 +117,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         """
         logger.add_filehandler(self.config.LOG_FILE)
 
-        #print("aaa")
-        #print(self.env.observation_space)
-
         self.actor_critic = ProposedPolicyOracle(
             agent_type = self.config.TRAINER_NAME,
             observation_space=self.env.observation_space,
@@ -451,7 +448,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self.actor_critic.eval()
             
             self.step = 0
-            max_step = 10
+            max_step = 200
             while (
                 #len(stats_episodes) < self.config.TEST_EPISODE_COUNT
                 self.step < max_step
@@ -649,7 +646,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             frame = observations_to_image(observations, infos, action.cpu().numpy())
                             rgb_frames[0].append(frame)
                         picture = rgb_frames[0][-1]
-                        for j in range(10):
+                        for j in range(5):
                             rgb_frames[0].append(picture) 
                         metrics=self._extract_scalars_from_info(infos)
                         name_ci = 0.0
