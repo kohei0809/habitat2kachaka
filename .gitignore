@@ -201,7 +201,6 @@ cpt/
 exp/
 *.csv
 taken_picture/
-*.txt
 o.*
 video_dir/
 log/
