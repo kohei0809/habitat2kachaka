@@ -247,7 +247,7 @@ def recreate_map(map_data):
                 
 
 if __name__ == "__main__":
-    client = kachaka_api.KachakaApiClient("192.168.100.37:26400")
+    client = kachaka_api.KachakaApiClient("192.168.100.31:26400")
     client.update_resolver()
     
     logmanager = LogManager()

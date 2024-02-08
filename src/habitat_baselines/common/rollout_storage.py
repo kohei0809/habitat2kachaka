@@ -34,7 +34,6 @@ class RolloutStorageOracle:
 
         self.observations["semMap"] = torch.zeros(
                 num_steps+1, 
-                num_envs,
                 50, 50, 3
             )
 

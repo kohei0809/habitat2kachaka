@@ -96,11 +96,12 @@ class RealRGBSensor(Sensor):
         
         size = self.observation_space.shape
         
-        if obs is None:
-            obs = self.pre_obs
-            print("Obs is None")
-        else:
-            obs[:, :, [0, 2]] = obs[:, :, [2, 0]]
+        while obs is None:
+            _, obs = self.cap.read()
+            #obs = self.pre_obs
+            #print("Obs is None")
+        
+        obs[:, :, [0, 2]] = obs[:, :, [2, 0]]
             
         obs = cv2.resize(obs, size[0:2])
                 
@@ -171,8 +172,12 @@ class RealWorld(Simulator):
             )
             sim_sensors.append(sensor_type(sensor_cfg))
         """
-        sim_sensors.append(RealRGBSensor(config=self.config.RGB_SENSOR))
-        sim_sensors.append(RealDepthSensor(config=self.config.DEPTH_SENSOR))
+        
+        print(config)
+        if "RGB_SENSOR" in config.AGENT_0.SENSORS:
+            sim_sensors.append(RealRGBSensor(config=self.config.RGB_SENSOR))
+        if "DEPTH_SENSOR" in config.AGENT_0.SENSORS:
+            sim_sensors.append(RealDepthSensor(config=self.config.DEPTH_SENSOR))
 
         self._sensor_suite = SensorSuite(sim_sensors)
         #self.sim_config = self.create_sim_config(self._sensor_suite)

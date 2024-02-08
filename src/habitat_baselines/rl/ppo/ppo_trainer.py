@@ -331,7 +331,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         client.update_resolver()
         # カチャカにshelfをstartに連れていく
         print("Get the shelf and Go to the Start")
-        client.move_shelf("S01", "L02")
+        client.move_shelf("S01", "L01")
         client.set_auto_homing_enabled(False)
         
         #ログ出力設定
@@ -354,15 +354,15 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 205
-        print("checkpoint_index=" + str(checkpoint_index+1))
+        checkpoint_index = 598
+        print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
             while checkpoint_path is None:
                 checkpoint_path = poll_checkpoint_folder(
                     self.config.EVAL_CKPT_PATH_DIR, checkpoint_index
                 )
-                #print("checkpoint_path=" + str(checkpoint_path))
+                print("checkpoint_path=" + str(checkpoint_path))
             print("checkpoint_path=" + str(checkpoint_path))
             logger.info(f"=======current_ckpt: {checkpoint_path}=======")
             checkpoint_index += 1
@@ -448,7 +448,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self.actor_critic.eval()
             
             self.step = 0
-            max_step = 200
+            max_step = 500
             while (
                 #len(stats_episodes) < self.config.TEST_EPISODE_COUNT
                 self.step < max_step
@@ -646,7 +646,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             frame = observations_to_image(observations, infos, action.cpu().numpy())
                             rgb_frames[0].append(frame)
                         picture = rgb_frames[0][-1]
-                        for j in range(5):
+                        for j in range(2):
                             rgb_frames[0].append(picture) 
                         metrics=self._extract_scalars_from_info(infos)
                         name_ci = 0.0

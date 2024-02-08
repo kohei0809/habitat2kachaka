@@ -18,12 +18,15 @@ from habitat_baselines.config.default import get_config
 
 def main():
     exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo.yaml"
+    #exp_config = "habitat_baselines/config/maximuminfo/ppo_maximuminfo_rgb.yaml"
     agent_type = "oracle-ego"
     run_type = "eval"
     start_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 
     
     if run_type == "eval":
         datadate = "23-10-26 18-29-56"
+        datadate = "23-12-26 04-22-23"
+        datadate = "23-10-03 16-04-23"
 
     config = get_config(exp_config)
     
@@ -73,7 +76,7 @@ def main():
     print("-----------------------------------")
 
     
-    ip = "192.168.100.37:26400"
+    ip = "192.168.100.31:26400"
     trainer._exec_kachaka(start_date, ip)
     #trainer._exec_kachaka(log_manager, start_date, ip)
        
