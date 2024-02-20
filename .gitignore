@@ -197,7 +197,6 @@ tb/
 
 
 train.log
-cpt/
 exp/
 *.csv
 taken_picture/
@@ -205,5 +204,4 @@ o.*
 video_dir/
 log/
 result/
-*.pth
 *.mp4
