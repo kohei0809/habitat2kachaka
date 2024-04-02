@@ -320,7 +320,6 @@ class EmbodiedTask:
             )
         )
     
-
         self._is_episode_active = self._check_episode_is_active(
             observations=observations, action=action
         )
@@ -329,7 +328,7 @@ class EmbodiedTask:
 
     def get_action_name(self, action_index: int):
         if action_index >= len(self.actions):
-            raise ValueError(f"Action index '{action}' is out of range.")
+            raise ValueError(f"Action index '{action_index}' is out of range.")
         return self._action_keys[action_index]
 
     @property
@@ -341,23 +340,7 @@ class EmbodiedTask:
             }
         )
 
-    def overwrite_sim_config(
-        self, sim_config: Config, episode: Type[Episode]
-    ) -> Config:
-        r"""Update config merging information from :p:`sim_config` and
-        :p:`episode`.
-
-        :param sim_config: config for simulator.
-        :param episode: current episode.
-        """
-        raise NotImplementedError
-
-    def _check_episode_is_active(
-        self,
-        *args: Any,
-        action: Union[int, Dict[str, Any]],
-        **kwargs: Any,
-    ) -> bool:
+    def _check_episode_is_active(self, *args: Any, action: Union[int, Dict[str, Any]], **kwargs: Any) -> bool:
         raise NotImplementedError
 
     @property

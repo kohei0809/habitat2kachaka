@@ -11,18 +11,17 @@ import cv2
 import time
 import pathlib
 import sys
+from PIL import Image
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional
+import pyrealsense2 as rs
 
-from einops import rearrange
 from matplotlib import pyplot as plt
 import math
 import numpy as np
 import torch
 import torch.nn.functional as F
-import torch_scatter
 import tqdm
-from torch.optim.lr_scheduler import LambdaLR
 
 from habitat import Config
 from habitat.core.logging import logger
@@ -92,8 +91,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         self._encoder = None
         
         self._num_picture = config.TASK_CONFIG.TASK.PICTURE.NUM_PICTURE
-        #撮った写真の
-        # RGB画像を保存
+        #撮った写真のRGB画像を保存
         self._taken_picture = []
         #撮った写真のciと位置情報、向きを保存
         self._taken_picture_list = []
@@ -104,6 +102,19 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         self.TARGET_THRESHOLD = 250
         self._dis_pre = []
+        
+        # ストリームの設定
+        realsense_config = rs.config()
+        realsense_config.enable_stream(rs.stream.color, 424, 240, rs.format.bgr8, 15)
+        realsense_config.enable_stream(rs.stream.depth, 424, 240, rs.format.z16, 15)
+
+        # ストリーミング開始
+        self.pipeline = rs.pipeline()
+        #self.pipeline.stop()
+        self.pipeline.start(realsense_config)
+        
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
 
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
@@ -322,24 +333,43 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
     #def _exec_kachaka(self, log_manager, date, ip) -> None:
     def _exec_kachaka(self, date, ip) -> None:
-        self.cap = cv2.VideoCapture(0)
-        _, frame = self.cap.read()
-        cv2.imshow('webカメラ', frame)
-        cv2.imwrite('photo.jpg', frame)
+        #self.cap = cv2.VideoCapture(0)
+        #_, frame = self.cap.read()
+        #cv2.imshow('webカメラ', frame)
+        #cv2.imwrite('photo.jpg', frame)
+
+        for _ in range(20):
+            # フレーム待ち
+            frames = self.pipeline.wait_for_frames()
+        
+        frames = self.align.process(frames)    
+        # RGB
+        color_frame = frames.get_color_frame()
+        # 深度
+        depth_frame = frames.get_depth_frame()
+            
+        color_image = np.asanyarray(color_frame.get_data())
+        color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+        color_image = Image.fromarray(color_image)
+        
+        depth_image = np.asanyarray(depth_frame.get_data())   
+        # 2次元データをカラーマップに変換
+        depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+        depth_colormap = Image.fromarray(depth_colormap)
+            
+        color_image.save("color.png")
+        depth_colormap.save("depth.png")
+        print("create")
+        # ストリーミング停止
+        self.pipeline.stop()
         
         client = kachaka_api.KachakaApiClient(ip)
         client.update_resolver()
         # カチャカにshelfをstartに連れていく
         print("Get the shelf and Go to the Start")
-        client.move_shelf("S01", "L01")
+        #sclient.move_shelf("S01", "L01")
+        client.move_shelf("S01", "start")
         client.set_auto_homing_enabled(False)
-        
-        #ログ出力設定
-        #self.log_manager = log_manager
-        #time, reward
-        #eval_reward_logger = self.log_manager.createLogWriter("reward")
-        #time, ci, exp_area, distance. path_length
-        #eval_metrics_logger = self.log_manager.createLogWriter("metrics")
         
         self.device = (
             torch.device("cuda", self.config.TORCH_GPU_ID)

@@ -9,11 +9,9 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from habitat_baselines.common.utils import CategoricalNet, Flatten, to_grid
-from habitat_baselines.rl.models.projection import Projection, RotateTensor, get_grid
+from habitat_baselines.common.utils import CategoricalNet
 from habitat_baselines.rl.models.rnn_state_encoder import RNNStateEncoder
 from habitat_baselines.rl.models.simple_cnn import RGBCNNOracle, MapCNN
-from habitat_baselines.rl.models.projection import Projection
 
 
 class PolicyOracle(nn.Module):
@@ -177,7 +175,6 @@ class ProposedNetOracle(Net):
 
         global_map_embedding = []
         global_map = observations['semMap']
-        #print(global_map.shape)
         global_map_embedding.append(self.occupancy_embedding(global_map.type(torch.LongTensor).to(self.device).view(-1)).view(bs, 50, 50 , -1))
         global_map_embedding = torch.cat(global_map_embedding, dim=3)
         map_embed = self.map_encoder(global_map_embedding)

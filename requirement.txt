@@ -28,7 +28,6 @@ grpcio==1.56.2
 grpcio-tools==1.56.2
 gym==0.10.9
 h11==0.14.0
--e git+https://github.com/kohei0809/habitat2kachaka@7ad05dfe7346709bc47891d89a0f5ba2dfd68e96#egg=habitat
 idna==3.4
 ifcfg==0.24
 imageio==2.32.0
