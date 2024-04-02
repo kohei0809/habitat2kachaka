@@ -7,29 +7,28 @@ import cv2
 import math
 import time
 
-from collections import OrderedDict
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Union
+
+from typing import Any, List, Optional, Union
+
+import pyrealsense2 as rs
+from typing import Any, List, Optional, Union
 
 import attr
 from gym import Space
 from gym import spaces
 import numpy as np
-from gym.spaces.dict_space import Dict as SpaceDict
 
 #import habitat_sim
 from habitat.config import Config
 from habitat.core.simulator import Simulator
-from habitat.core.dataset import Episode
 from habitat.core.registry import registry
 from habitat.core.simulator import (
-    AgentState,
     Config,
     Observations,
     Sensor,
     SensorSuite,
     SensorTypes,
-    ShortestPathPoint,
     Simulator,
 )
 
@@ -67,14 +66,22 @@ def check_sim_obs(obs, sensor):
 
 @registry.register_sensor
 class RealRGBSensor(Sensor):
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        #self.sim_sensor_type = habitat_sim.SensorType.COLOR
-        self.cap = cv2.VideoCapture(0)
-        self.pre_obs = None
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args: Any, **kwargs: Any) -> None:        
+        # ストリームの設定
+        realsense_config = rs.config()
+        realsense_config.enable_stream(rs.stream.color, 424, 240, rs.format.bgr8, 30)
+        
+        # ストリーミング開始
+        self.pipeline = rs.pipeline()
+        self.pipeline.start(realsense_config)
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
+        
+        self.pre_frames = None
+        
+        #self.cap = cv2.VideoCapture(0)
         
     def __exit__(self):
-        self.cap.release()
         cv2.destroyAllWindows()
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
@@ -92,21 +99,42 @@ class RealRGBSensor(Sensor):
         )
 
     def get_observation(self) -> Any:
-        _, obs = self.cap.read()
+        """
+        for _ in range(20):
+            flag, frames = self.pipeline.try_wait_for_frames()
+
+        while True:
+            flag, frames = self.pipeline.try_wait_for_frames()
+            if flag == True: 
+                break
+        """
+        while True:
+            try:
+                frames = self.pipeline.wait_for_frames()
+                break
+            except:
+                print("rgb")
+                ctx = rs.context()
+                devices = ctx.query_devices()
+                for dev in devices:
+                    dev.hardware_reset()
+                    print(dev)
+                print("reset done")
+            
+        self.pre_frames = frames
+        frames = self.align.process(frames)    
+        # RGB
+        color_frame = frames.get_color_frame()
+        
+        color_image = np.asanyarray(color_frame.get_data())
+        color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
         
         size = self.observation_space.shape
         
-        while obs is None:
-            _, obs = self.cap.read()
-            #obs = self.pre_obs
-            #print("Obs is None")
-        
-        obs[:, :, [0, 2]] = obs[:, :, [2, 0]]
-            
-        obs = cv2.resize(obs, size[0:2])
-                
-        self.pre_obs = obs
-        return obs
+        rgb_obs = cv2.resize(color_image, size[0:2])
+          
+        rgb_obs = rgb_obs.astype(np.float64)
+        return rgb_obs
 
 
 @registry.register_sensor
@@ -122,11 +150,22 @@ class RealDepthSensor(Sensor):
             self.min_depth_value = config.MIN_DEPTH
             self.max_depth_value = config.MAX_DEPTH
             
-        self.cap = cv2.VideoCapture(0)
+        #self.cap = cv2.VideoCapture(0)
+        
+        # ストリームの設定
+        realsense_config = rs.config()
+        realsense_config.enable_stream(rs.stream.depth, 424, 240, rs.format.z16, 30)
+
+        # ストリーミング開始
+        self.pipeline = rs.pipeline()
+        self.pipeline.start(realsense_config)
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
+        
+        self.pre_frames = None
         super().__init__(*args, **kwargs)
         
     def __exit__(self):
-        self.cap.release()
         cv2.destroyAllWindows()
 
     def _get_uuid(self, *args: Any, **kwargs: Any) -> str:
@@ -144,13 +183,37 @@ class RealDepthSensor(Sensor):
         )
 
     def get_observation(self):
-        # あとで変更
-        import numpy as np
-        obs = np.random.rand(self.observation_space.shape[0], self.observation_space.shape[1], 1)
-        #obs = np.ones((self.observation_space.shape[0], self.observation_space.shape[1], 1))
-        
+        """
+        while True:
+            flag, frames = self.pipeline.try_wait_for_frames()
+            if flag == True: 
+                break
+        """
+        while True:
+            try:
+                frames = self.pipeline.wait_for_frames()
+                break
+            except:
+                print("depth")
+                ctx = rs.context()
+                devices = ctx.query_devices()
+                for dev in devices:
+                    dev.hardware_reset()
+                    print(dev)
+                print("reset done")
+            
+        frames = self.align.process(frames)  
+        # 深度
+        depth_frame = frames.get_depth_frame()
+        depth_image = np.asanyarray(depth_frame.get_data())     
+        depth_image = depth_image/1000
+            
+        size = self.observation_space.shape
+        obs = cv2.resize(depth_image, size[0:2])
+        obs = obs[:,:,np.newaxis]
+          
+        obs = obs.astype(np.float64)
         return obs
-
 
 @registry.register_simulator(name="Real-v0")
 class RealWorld(Simulator):
@@ -159,19 +222,8 @@ class RealWorld(Simulator):
     def __init__(self, config: Config, client) -> None:
         self.config = config
         self._client = client
-        agent_config = self._get_agent_config()
 
         sim_sensors = []
-        """
-        for sensor_name in agent_config.SENSORS:
-            sensor_cfg = getattr(self.config, sensor_name)
-            sensor_type = registry.get_sensor(sensor_cfg.TYPE)
-
-            assert sensor_type is not None, "invalid sensor type {}".format(
-                sensor_cfg.TYPE
-            )
-            sim_sensors.append(sensor_type(sensor_cfg))
-        """
         
         print(config)
         if "RGB_SENSOR" in config.AGENT_0.SENSORS:
@@ -180,48 +232,6 @@ class RealWorld(Simulator):
             sim_sensors.append(RealDepthSensor(config=self.config.DEPTH_SENSOR))
 
         self._sensor_suite = SensorSuite(sim_sensors)
-        #self.sim_config = self.create_sim_config(self._sensor_suite)
-        #self._action_space = spaces.Discrete(
-        #    len(self.sim_config.agents[0].action_space)
-        #)
-        
-        
-    def create_sim_config(
-        self, _sensor_suite: SensorSuite
-    ):
-        sim_config = habitat_sim.SimulatorConfiguration()
-        overwrite_config(
-            config_from=self.config.HABITAT_SIM_V0, config_to=sim_config
-        )
-        agent_config = habitat_sim.AgentConfiguration()
-        overwrite_config(
-            config_from=self._get_agent_config(), config_to=agent_config
-        )
-
-        sensor_specifications = []
-        for sensor in _sensor_suite.sensors.values():
-            sim_sensor_cfg = habitat_sim.SensorSpec()
-            overwrite_config(
-                config_from=sensor.config, config_to=sim_sensor_cfg
-            )
-            sim_sensor_cfg.uuid = sensor.uuid
-            sim_sensor_cfg.resolution = list(
-                sensor.observation_space.shape[:2]
-            )
-            sim_sensor_cfg.parameters["hfov"] = str(sensor.config.HFOV)
-
-            #sim_sensor_cfg.sensor_type = sensor.sim_sensor_type  # type: ignore
-            sim_sensor_cfg.gpu2gpu_transfer = (
-                self.config.HABITAT_SIM_V0.GPU_GPU
-            )
-            sensor_specifications.append(sim_sensor_cfg)
-
-        agent_config.sensor_specifications = sensor_specifications
-        agent_config.action_space = registry.get_action_space_configuration(
-            self.config.ACTION_SPACE_CONFIG
-        )(self.config).get()
-
-        return habitat_sim.Configuration(sim_config, [agent_config])
 
     @property
     def sensor_suite(self) -> SensorSuite:
@@ -264,7 +274,6 @@ class RealWorld(Simulator):
         y = pos.y
         z = 0.0
         theta_rad = pos.theta + math.pi/2
-        theta_deg = math.degrees(theta_rad)
         
         return {"position":[x, z, y], "rotation": theta_rad}
 
@@ -276,13 +285,6 @@ class RealWorld(Simulator):
         return agent_config
     
     
-    def get_observations_at(
-        self,
-        position: Optional[List[float]] = None,
-        rotation: Optional[List[float]] = None,
-        keep_agent_at_new_pose: bool = False,
-    ) -> Optional[Observations]:
-        current_state = self.get_agent_state()
-
+    def get_observations_at(self) -> Optional[Observations]:
         observations = self._sensor_suite.get_observations()
         return observations

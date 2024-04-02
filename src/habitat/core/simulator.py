@@ -201,12 +201,7 @@ class Simulator:
         """
         raise NotImplementedError
 
-    def get_observations_at(
-        self,
-        position: List[float],
-        rotation: List[float],
-        keep_agent_at_new_pose: bool = False,
-    ) -> Optional[Observations]:
+    def get_observations_at(selfs) -> Optional[Observations]:
         """Returns the observation.
 
         :param position: list containing 3 entries for :py:`(x, y, z)`.

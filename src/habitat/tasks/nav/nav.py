@@ -1321,7 +1321,7 @@ class MoveForwardAction(Action):
         print("MOVE_FORWARD " + str(self._meter) + "[m]")
         
         move(self._client, x+delta_x, y+delta_y, theta_rad)
-        time.sleep(0.5)
+        #time.sleep(0.5)
 
         return self._sim.get_observations_at()
 
@@ -1345,7 +1345,7 @@ class TurnLeftAction(Action):
         angle = math.radians(self._angle)
         print("TURN_LEFT " + str(self._angle) + "[度]")
         move(self._client, x, y, theta_rad+angle)
-        time.sleep(0.5)
+        #time.sleep(0.5)
         
         return self._sim.get_observations_at()
     
@@ -1370,7 +1370,7 @@ class TurnRightAction(Action):
         angle = math.radians(-self._angle)
         print("TURN_RIGHT " + str(-self._angle) + "[度]")
         move(self._client, x, y, theta_rad+angle)
-        time.sleep(0.5)
+        #time.sleep(0.5)
         
         return self._sim.get_observations_at()
     
@@ -1393,7 +1393,7 @@ class TakePicture(Action):
         """
         task.is_found_called = True
         print("TAKE_PICTURE")
-        #self._client.speak("写真を撮りました。")
+        self._client.speak("写真を撮りました。")
         return self._sim.get_observations_at()
     
     def set_client(self, client):
@@ -1406,11 +1406,6 @@ class InformationTask(EmbodiedTask):
         self, config: Config, sim: Simulator, client=None, dataset: Optional[Dataset] = None
     ) -> None:
         super().__init__(config=config, sim=sim, client=client, dataset=dataset)
-        
-    def overwrite_sim_config(
-        self, sim_config: Any, episode: Type[Episode]
-    ) -> Any:
-        return merge_sim_episode_config(sim_config, episode)
 
     def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:
         return not getattr(self, "is_stop_called", False)
@@ -1422,11 +1417,6 @@ class NavigationTask(EmbodiedTask):
         self, config: Config, sim: Simulator, dataset: Optional[Dataset] = None
     ) -> None:
         super().__init__(config=config, sim=sim, dataset=dataset)
-        
-    def overwrite_sim_config(
-        self, sim_config: Any, episode: Type[Episode]
-    ) -> Any:
-        return merge_sim_episode_config(sim_config, episode)
 
     def _check_episode_is_active(self, *args: Any, **kwargs: Any) -> bool:
         return not getattr(self, "is_stop_called", False)
