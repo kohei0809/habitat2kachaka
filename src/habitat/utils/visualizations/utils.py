@@ -101,7 +101,7 @@ def images_to_video(
     images: List[np.ndarray],
     output_dir: str,
     video_name: str,
-    fps: int = 10,
+    fps: int = 5,
     quality: Optional[float] = 5,
     **kwargs,
 ):
@@ -203,7 +203,10 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
         rgb = observation["rgb"]
         if not isinstance(rgb, np.ndarray):
             rgb = rgb.cpu().numpy()
+            
+        rgb = rgb.astype(np.uint8)
 
+        #print(f"rgb: {rgb.shape}")
         egocentric_view.append(rgb)
 
     # draw depth map if observation has depth info
@@ -216,6 +219,7 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
 
         depth_map = depth_map.astype(np.uint8)
         depth_map = np.stack([depth_map for _ in range(3)], axis=2)
+        #print(f"depth: {depth_map.shape}")
         egocentric_view.append(depth_map)
     
     assert (

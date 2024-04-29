@@ -12,7 +12,10 @@ if __name__ == "__main__":
     client = kachaka_api.KachakaApiClient(sys.argv[1])
     print(client.get_locations())
     # 棚をとりにいく
-    client.move_shelf("S01", "L01")
+    #client.move_shelf("S01", "start")
+    #move(client, 3.8, 1.5, np.pi)
+    
     while True:
-        move(client, 4.6, 2.5, np.pi)
-        move(client, 0.8, 4, np.pi / 2)
+        move(client, 3.8, 1.5, np.pi)
+        move(client, 3.8, -2.5, np.pi / 2)
+    

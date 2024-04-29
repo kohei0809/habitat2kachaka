@@ -39,7 +39,6 @@ ipywidgets==8.1.0
 jedi==0.19.1
 Jinja2==3.1.2
 jupyterlab-widgets==3.0.9
--e git+https://github.com/kohei0809/habitat2kachaka@7ad05dfe7346709bc47891d89a0f5ba2dfd68e96#egg=kachaka_api&subdirectory=kachaka-api
 kiwisolver==1.4.5
 llvmlite==0.41.1
 Markdown==3.5.1

@@ -78,8 +78,9 @@ class RealRGBSensor(Sensor):
         self.align = rs.align(align_to)
         
         self.pre_frames = None
-        
         #self.cap = cv2.VideoCapture(0)
+        
+        super().__init__(*args, **kwargs)
         
     def __exit__(self):
         cv2.destroyAllWindows()
@@ -99,15 +100,7 @@ class RealRGBSensor(Sensor):
         )
 
     def get_observation(self) -> Any:
-        """
-        for _ in range(20):
-            flag, frames = self.pipeline.try_wait_for_frames()
 
-        while True:
-            flag, frames = self.pipeline.try_wait_for_frames()
-            if flag == True: 
-                break
-        """
         while True:
             try:
                 frames = self.pipeline.wait_for_frames()

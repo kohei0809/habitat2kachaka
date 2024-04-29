@@ -333,6 +333,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
     #def _exec_kachaka(self, log_manager, date, ip) -> None:
     def _exec_kachaka(self, date, ip) -> None:
+        max_step = 5
         #self.cap = cv2.VideoCapture(0)
         #_, frame = self.cap.read()
         #cv2.imshow('webカメラ', frame)
@@ -384,7 +385,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 598
+        checkpoint_index = 361
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
@@ -478,7 +479,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self.actor_critic.eval()
             
             self.step = 0
-            max_step = 500
             while (
                 #len(stats_episodes) < self.config.TEST_EPISODE_COUNT
                 self.step < max_step

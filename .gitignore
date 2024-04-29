@@ -205,3 +205,6 @@ video_dir/
 log/
 result/
 *.mp4
+.keep
+*.png
+*.jpeg

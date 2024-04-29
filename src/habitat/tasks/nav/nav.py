@@ -780,6 +780,8 @@ class TopDownMap(Measure):
         return top_down_map
     
     def _clip_map(self, _map, fog=False):
+        print(f"clip: {self._ind_y_min - self._grid_delta} ~ {self._ind_y_max + self._grid_delta}")
+        print(f"clip: {self._ind_x_min - self._grid_delta} ~ {self._ind_x_max + self._grid_delta}")
         return _map[
             self._ind_y_min - self._grid_delta : self._ind_y_max + self._grid_delta,
             self._ind_x_min - self._grid_delta : self._ind_x_max + self._grid_delta,

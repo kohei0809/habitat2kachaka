@@ -2,6 +2,7 @@ LICENSE
 README.md
 pyproject.toml
 python/demos/kachaka_api_pb2.py
+python/demos/kachaka_api_pb2.pyi
 python/demos/kachaka_api_pb2_grpc.py
 python/demos/sample_llm_speak.py
 python/demos/smart_speaker.py
@@ -20,6 +21,7 @@ python/kachaka_api.egg-info/top_level.txt
 python/kachaka_api/aio/__init__.py
 python/kachaka_api/aio/base.py
 python/kachaka_api/generated/kachaka_api_pb2.py
+python/kachaka_api/generated/kachaka_api_pb2.pyi
 python/kachaka_api/generated/kachaka_api_pb2_grpc.py
 python/kachaka_api/util/command.py
 python/kachaka_api/util/geometry.py

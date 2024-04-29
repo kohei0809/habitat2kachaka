@@ -25,7 +25,7 @@ CONFIG_FILE_SEPARATOR = ","
 # Config definition
 # -----------------------------------------------------------------------------
 _C = CN()
-_C.SEED = 100
+_C.SEED = 42
 # -----------------------------------------------------------------------------
 # ENVIRONMENT
 # -----------------------------------------------------------------------------
@@ -51,7 +51,7 @@ _C.TASK.TYPE = "Nav-v0"
 _C.TASK.SUCCESS_DISTANCE = 0.2
 _C.TASK.SENSORS = []
 _C.TASK.MEASUREMENTS = []
-_C.TASK.GOAL_SENSOR_UUID = "pointgoal"
+#_C.TASK.GOAL_SENSOR_UUID = "multiobjectgoal"
 _C.TASK.POSSIBLE_ACTIONS = ["STOP", "MOVE_FORWARD", "TURN_LEFT", "TURN_RIGHT"]
 # -----------------------------------------------------------------------------
 # # ACTIONS
@@ -183,13 +183,13 @@ _C.TASK.PSPL.TYPE = "PSPL"
 # -----------------------------------------------------------------------------
 _C.TASK.FOW_MAP = CN()
 _C.TASK.FOW_MAP.TYPE = "FowMap"
-_C.TASK.FOW_MAP.VISIBILITY_DIST = 3.0
+_C.TASK.FOW_MAP.VISIBILITY_DIST = 6.0
 _C.TASK.FOW_MAP.FOV = 79
 # -----------------------------------------------------------------------------
 # PICTURE_MAP
 # -----------------------------------------------------------------------------
 _C.TASK.PICTURE_MAP = CN()
-_C.TASK.PICTURE_MAP.VISIBILITY_DIST = 3.0
+_C.TASK.PICTURE_MAP.VISIBILITY_DIST = 6.0
 _C.TASK.PICTURE_MAP.FOV = 79
 
 # -----------------------------------------------------------------------------
@@ -198,7 +198,7 @@ _C.TASK.PICTURE_MAP.FOV = 79
 _C.TASK.TOP_DOWN_MAP = CN()
 _C.TASK.TOP_DOWN_MAP.TYPE = "TopDownMap"
 _C.TASK.TOP_DOWN_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
-_C.TASK.TOP_DOWN_MAP.MAP_PADDING = 3
+_C.TASK.TOP_DOWN_MAP.MAP_PADDING = 5
 _C.TASK.TOP_DOWN_MAP.NUM_TOPDOWN_MAP_SAMPLE_POINTS = 20000
 _C.TASK.TOP_DOWN_MAP.MAP_RESOLUTION = 1250
 _C.TASK.TOP_DOWN_MAP.DRAW_SOURCE = True
@@ -206,7 +206,7 @@ _C.TASK.TOP_DOWN_MAP.DRAW_BORDER = True
 _C.TASK.TOP_DOWN_MAP.DRAW_SHORTEST_PATH = True
 _C.TASK.TOP_DOWN_MAP.FOG_OF_WAR = CN()
 _C.TASK.TOP_DOWN_MAP.FOG_OF_WAR.DRAW = True
-_C.TASK.TOP_DOWN_MAP.FOG_OF_WAR.VISIBILITY_DIST = 3.0
+_C.TASK.TOP_DOWN_MAP.FOG_OF_WAR.VISIBILITY_DIST = 5.0
 _C.TASK.TOP_DOWN_MAP.FOG_OF_WAR.FOV = 79
 _C.TASK.TOP_DOWN_MAP.DRAW_VIEW_POINTS = True
 _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_POSITIONS = True
@@ -219,7 +219,7 @@ _C.TASK.TOP_DOWN_MAP.DRAW_GOAL_AABBS = True
 _C.TASK.PICTURE_RANGE_MAP = CN()
 _C.TASK.PICTURE_RANGE_MAP.TYPE = "PictureRangeMap"
 _C.TASK.PICTURE_RANGE_MAP.MAX_EPISODE_STEPS = _C.ENVIRONMENT.MAX_EPISODE_STEPS
-_C.TASK.PICTURE_RANGE_MAP.MAP_PADDING = 3
+_C.TASK.PICTURE_RANGE_MAP.MAP_PADDING = 5
 _C.TASK.PICTURE_RANGE_MAP.NUM_TOPDOWN_MAP_SAMPLE_POINTS = 20000
 _C.TASK.PICTURE_RANGE_MAP.MAP_RESOLUTION = 1250
 _C.TASK.PICTURE_RANGE_MAP.DRAW_SOURCE = True
@@ -227,7 +227,7 @@ _C.TASK.PICTURE_RANGE_MAP.DRAW_BORDER = True
 _C.TASK.PICTURE_RANGE_MAP.DRAW_SHORTEST_PATH = True
 _C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR = CN()
 _C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.DRAW = True
-_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.VISIBILITY_DIST = 3.0
+_C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.VISIBILITY_DIST = 5.0
 _C.TASK.PICTURE_RANGE_MAP.FOG_OF_WAR.FOV = 79
 _C.TASK.PICTURE_RANGE_MAP.DRAW_VIEW_POINTS = True
 _C.TASK.PICTURE_RANGE_MAP.DRAW_GOAL_POSITIONS = True
@@ -318,7 +318,7 @@ _C.TASK.ANSWER_ACCURACY.TYPE = "AnswerAccuracy"
 # SIMULATOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR = CN()
-_C.SIMULATOR.TYPE = "Real-v0"
+_C.SIMULATOR.TYPE = "Sim-v0"
 _C.SIMULATOR.ACTION_SPACE_CONFIG = "v0"
 _C.SIMULATOR.FORWARD_STEP_SIZE = 0.25  # in metres
 _C.SIMULATOR.SCENE = (
@@ -341,12 +341,12 @@ SIMULATOR_SENSOR.ORIENTATION = [0.0, 0.0, 0.0]  # Euler's angles
 # RGB SENSOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR.RGB_SENSOR = SIMULATOR_SENSOR.clone()
-_C.SIMULATOR.RGB_SENSOR.TYPE = "RealRGBSensor"
+_C.SIMULATOR.RGB_SENSOR.TYPE = "HabitatSimRGBSensor"
 # -----------------------------------------------------------------------------
 # DEPTH SENSOR
 # -----------------------------------------------------------------------------
 _C.SIMULATOR.DEPTH_SENSOR = SIMULATOR_SENSOR.clone()
-_C.SIMULATOR.DEPTH_SENSOR.TYPE = "RealDepthSensor"
+_C.SIMULATOR.DEPTH_SENSOR.TYPE = "HabitatSimDepthSensor"
 _C.SIMULATOR.DEPTH_SENSOR.MIN_DEPTH = 0.0
 _C.SIMULATOR.DEPTH_SENSOR.MAX_DEPTH = 10.0
 _C.SIMULATOR.DEPTH_SENSOR.NORMALIZE_DEPTH = True

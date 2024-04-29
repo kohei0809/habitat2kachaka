@@ -7,10 +7,10 @@ class LogWriter:
             pass
             
     #改行なし
-    def write(self, log: str) -> None:
+    def write(self, log)-> None:
         #ファイルへ追記
         with open(self.file_path, 'a', newline='') as f:
-            f.write(log + ",")
+            f.write(str(log) + ",")
             
     #改行あり
     def writeLine(self, log: str="") -> None:
