@@ -127,8 +127,8 @@ class BaseRLTrainerOracle(BaseTrainer):
         not_done_masks,
         current_episode_reward,
         current_episode_exp_area,
-        current_episode_distance,
-        current_episode_ci,
+        current_episode_picsim,
+        current_episode_sum_saliency,
         prev_actions,
         batch,
         rgb_frames,
@@ -147,8 +147,8 @@ class BaseRLTrainerOracle(BaseTrainer):
             not_done_masks = not_done_masks[state_index]
             current_episode_reward = current_episode_reward[state_index]
             current_episode_exp_area = current_episode_exp_area[state_index]
-            current_episode_distance = current_episode_distance[state_index]
-            current_episode_ci = current_episode_ci[state_index]
+            current_episode_picsim = current_episode_picsim[state_index]
+            current_episode_sum_saliency = current_episode_sum_saliency[state_index]
             prev_actions = prev_actions[state_index]
 
             for k, v in batch.items():
@@ -162,9 +162,10 @@ class BaseRLTrainerOracle(BaseTrainer):
             not_done_masks,
             current_episode_reward,
             current_episode_exp_area,
-            current_episode_distance,
-            current_episode_ci,
+            current_episode_picsim,
+            current_episode_sum_saliency,
             prev_actions,
             batch,
             rgb_frames,
         )
+

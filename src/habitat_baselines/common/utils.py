@@ -148,7 +148,6 @@ def generate_video(
     episode_id: int,
     checkpoint_idx: int,
     metrics: Dict[str, float],
-    tb_writer: TensorboardWriter,
     name_ci = None,
     fps: int = 5,
 ) -> None:

@@ -15,6 +15,7 @@ from PIL import Image
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional
 import pyrealsense2 as rs
+import clip
 
 from matplotlib import pyplot as plt
 import math
@@ -93,7 +94,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         self._num_picture = config.TASK_CONFIG.TASK.PICTURE.NUM_PICTURE
         #撮った写真のRGB画像を保存
         self._taken_picture = []
-        #撮った写真のciと位置情報、向きを保存
+        #撮った写真のsaliencyとrange_mapを保存
         self._taken_picture_list = []
         
         self._observed_object_ci = []
@@ -165,7 +166,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         """
         return torch.load(checkpoint_path, *args, **kwargs)
 
-    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "traj_metrics", "ci"}
+    METRICS_BLACKLIST = {"top_down_map", "collisions.is_collision", "traj_metrics", "saliency"}
 
     @classmethod
     def _extract_scalars_from_info(
@@ -175,11 +176,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         for k, v in info.items():
             if k in cls.METRICS_BLACKLIST:
                 continue
-
-            """
-            if k == "ci":
-                result[k] = float(v[0])
-            """
                 
             if isinstance(v, dict):
                 result.update(
@@ -210,36 +206,77 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
         return results
     
+    def _create_caption(self, picture):
+        # 画像からcaptionを生成する
+        image = Image.fromarray(picture)
+        image = self.vis_processors["eval"](image).unsqueeze(0).to(self.device)
+        generated_text = self.lavis_model.generate({"image": image}, use_nucleus_sampling=True,num_captions=1)[0]
+        return generated_text
     
-    def _delete_observed_target(self):
-        for i in self._target_index_list[0]:
-            if self._observed_object_ci[0][i-maps.MAP_TARGET_POINT_INDICATOR] > self.TARGET_THRESHOLD:
-                self._target_index_list[0].remove(i)
-
-    
-    def _do_take_picture_object(self, top_down_map, fog_of_war_map):
-        # maps.MAP_TARGET_POINT_INDICATOR(6)が写真の中に何グリッドあるかを返す
-        ci = 0
-        for i in range(len(top_down_map[0])):
-            for j in range(len(top_down_map[0][0])):
-                if fog_of_war_map[0][i][j] == 1:
-                    if top_down_map[0][i][j] in self._target_index_list[0]:
-                        ci += 1
-                        self._observed_object_ci[0][top_down_map[0][i][j]-maps.MAP_TARGET_POINT_INDICATOR]+=1
-                        if top_down_map[0][i][j] not in self._taken_index_list[0]:
-                            self._taken_index_list[0].append(top_down_map[0][i][j])
-
-        # ciが閾値を超えているobjectがあれば削除
-        self._delete_observed_target()
+    def create_description(self, picture_list):
+        # captionを連結してdescriptionを生成する
+        description = ""
         
-        # もし全部のobjectが削除されたら、リセット
-        if len(self._target_index_list[0]) == 0:
-            self._target_index_list[0] = [maps.MAP_TARGET_POINT_INDICATOR, maps.MAP_TARGET_POINT_INDICATOR+1, maps.MAP_TARGET_POINT_INDICATOR+2]
-            self._observed_object_ci[0] = [0, 0, 0]
+        for i in range(len(picture_list)):
+            description += (picture_list[i][3] + ". ")
             
-        return ci
+        return description
+    
+    def _create_new_description_embedding(self, caption):
+        # captionのembeddingを作成
+        embedding = self.bert_model.encode(caption, convert_to_tensor=True)
+        return embedding
+    
+    def _create_new_image_embedding(self, obs):
+        image = Image.fromarray(obs)
+        image = self.preprocess(image)
+        image = torch.tensor(image).to(self.device).unsqueeze(0)
+        embetting = self.clip_model.encode_image(image).float()
+        return embetting
+    
+    def _cal_remove_index(self, picture_list, new_emmbedding):
+        # 削除する写真を決める
+        # 他のsyasinnとの類似度を計算し、合計が最大のものを削除
+        
+        sim_list = [[-10 for _ in range(len(picture_list)+1)] for _ in range(len(picture_list)+1)]
+        sim_list[len(picture_list)][len(picture_list)] = 0.0
+        for i in range(len(picture_list)):
+            emd = picture_list[i][2]
+            sim_list[i][len(picture_list)] = util.pytorch_cos_sim(emd, new_emmbedding).item()
+            sim_list[len(picture_list)][i] = sim_list[i][len(picture_list)]
+            for j in range(i, len(picture_list)):
+                if i == j:
+                    sim_list[i][j] = 0.0
+                    continue
+                    
+                #logger.info(f"len: {len(picture_list)}, i: {i}, j: {j}")
+                sim_list[i][j] = util.pytorch_cos_sim(emd, picture_list[j][2]).item()
+                sim_list[j][i] = sim_list[i][j]
+                
+        total_sim = [sum(similarity_list) for similarity_list in sim_list]
+        remove_index = total_sim.index(max(total_sim))
+        return remove_index
+
+    def _calculate_pic_sim(self, picture_list):
+        if len(picture_list) <= 1:
+            return 0.0
             
-            
+        sim_list = [[-10 for _ in range(len(picture_list))] for _ in range(len(picture_list))]
+
+        for i in range(len(picture_list)):
+            emd = picture_list[i][2]
+            for j in range(i, len(picture_list)):
+                if i == j:
+                    sim_list[i][j] = 0.0
+                    continue
+                    
+                sim_list[i][j] = util.pytorch_cos_sim(emd, picture_list[j][2]).item()
+                sim_list[j][i] = sim_list[i][j]
+                
+        total_sim = np.sum(sim_list)
+        total_sim /= (len(picture_list)*(len(picture_list)-1))
+        return total_sim
+    
     # 写真を撮った範囲のマップを作成
     def _create_picture_range_map(self, top_down_map, fog_of_war_map):
         # 0: 壁など, 1: 写真を撮った範囲, 2: 巡回可能領域
@@ -265,7 +302,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         y_pre = len(pre_fog_map)
         x_pre = len(pre_fog_map[0])
         
-        
+        per = -1.0
         if (x==x_pre) and (y==y_pre):
             for i in range(y):
                 for j in range(x):
@@ -282,17 +319,18 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 per = num_covered / num
             
             if per < threshold:
-                return False
+                return False, per
             else:
-                return True
+                return True, per
         else:
-            False
+            logger.info("CHECK, false")
+            return False, per
         
     # fog_mapがidx以外のpre_fog_mapと被っている割合を算出
     def _cal_rate_of_fog_other(self, fog_map, pre_fog_of_war_map_list, cover_list, idx):
         y = len(fog_map)
         x = len(fog_map[0])
-        
+
         num = 0.0 #fog_mapのMAP_VALID_POINTの数
         num_covered = 0.0 #pre_fog_mapのどれかと被っているグリッド数
         
@@ -312,8 +350,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         # fogとpre_fogがかぶっている時
                         if pre_map[i][j] == 1:
                             num_covered += 1
-                            break
-                        
+                            break               
         if num == 0:
             rate = 0.0
         else:
@@ -321,15 +358,16 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         return rate
     
-    
-    def _compare_with_changed_CI(self, picture_range_map, pre_fog_of_war_map_list, cover_list, ci, pre_ci, idx):
+    def _compareWithChangedSal(self, picture_range_map, pre_fog_of_war_map_list, cover_list, saliency, pre_saliency, idx):
         rate = self._cal_rate_of_fog_other(picture_range_map, pre_fog_of_war_map_list, cover_list, idx)
-        ci = ci * (1-rate) # k以外と被っている割合分小さくする
-        if ci > pre_ci:
-            return True
+        saliency = saliency * (1-rate) # k以外と被っている割合分小さくする
+        #logger.info(f"LIST_SIZE: {len(cover_list)}, RATE: {rate}, saliency: {saliency}, pre_saliency: {pre_saliency}")
+        if saliency > pre_saliency:
+            return 0
+        elif saliency == pre_saliency:
+            return 1
         else:
-            return False
-        
+            return 2
 
     #def _exec_kachaka(self, log_manager, date, ip) -> None:
     def _exec_kachaka(self, date, ip) -> None:
@@ -385,7 +423,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 361
+        checkpoint_index = 108
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
@@ -429,32 +467,29 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
             self._taken_picture = []
             self._taken_picture_list = []
-            self._target_index_list = []
-            self._taken_index_list = []
-            self._observed_object_ci = []
         
             self._taken_picture.append([])
             self._taken_picture_list.append([])
-            self._target_index_list.append([maps.MAP_TARGET_POINT_INDICATOR, maps.MAP_TARGET_POINT_INDICATOR+1, maps.MAP_TARGET_POINT_INDICATOR+2])
-            self._taken_index_list.append([])
-            self._observed_object_ci.append([0, 0, 0])
-            self._dis_pre.append(-1)
             
+            # Sentence-BERTモデルの読み込み
+            self.bert_model = SentenceTransformer('all-MiniLM-L6-v2')
+            
+            # lavisモデルの読み込み
+            self.lavis_model, self.vis_processors, _ = load_model_and_preprocess(name="blip_caption", model_type="base_coco", is_eval=True, device=self.device)
+            self.bert_model.to(self.device)
+            self.lavis_model.to(self.device)
+
+            # Load the clip model
+            self.clip_model, self.preprocess = clip.load('ViT-B/32', self.device)
+        
             observations = self.env.reset()
             batch = batch_obs(observations, device=self.device)
 
-            current_episode_reward = torch.zeros(
-                1, 1, device=self.device
-            )
-            current_episode_exp_area = torch.zeros(
-                1, 1, device=self.device
-            )
-            current_episode_distance = torch.zeros(
-                1, 1, device=self.device
-            )
-            current_episode_ci = torch.zeros(
-                1, 1, device=self.device
-            )
+            current_episode_reward = torch.zeros(1, 1, device=self.device)
+            current_episode_exp_area = torch.zeros(1, 1, device=self.device)
+            current_episode_picsim = torch.zeros(1, 1, device=self.device)
+            current_episode_sum_saliency = torch.zeros(1, 1, device=self.device)
+            
             
             test_recurrent_hidden_states = torch.zeros(
                 self.actor_critic.net.num_recurrent_layers,
@@ -503,6 +538,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         not_done_masks,
                         deterministic=False,
                     )
+                    
+                    pre_ac = torch.zeros(prev_actions.shape[0], 1, device=self.device, dtype=torch.long)
+                    for i in range(prev_actions.shape[0]):
+                        pre_ac[i] = prev_actions[i]
 
                     prev_actions.copy_(action)
 
@@ -518,144 +557,172 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 )
                 
                 reward = []
-                ci = []
+                saliency = []
+                pic_sim = []
                 exp_area = [] # 探索済みのエリア()
                 exp_area_pre = []
-                distance = []
                 fog_of_war_map = []
                 top_down_map = [] 
-                top_map = []
+                sum_saliency = []
                 n_envs = 1
                 
-                reward.append(rewards[0][0])
-                ci.append(rewards[0][1])
-                exp_area.append(rewards[0][2]-rewards[0][3])
-                exp_area_pre.append(rewards[0][3])
-                fog_of_war_map.append(infos["picture_range_map"]["fog_of_war_mask"])
-                top_down_map.append(infos["picture_range_map"]["map"])
-                top_map.append(infos["top_down_map"]["map"])
+                reward.append(rewards[i][0])
+                saliency.append(rewards[i][1])
+                pic_sim.append(0)
+                exp_area.append(rewards[i][2]-rewards[i][3])
+                exp_area_pre.append(rewards[i][3])
+                fog_of_war_map.append(infos[i]["picture_range_map"]["fog_of_war_mask"])
+                top_down_map.append(infos[i]["picture_range_map"]["map"])
+                sum_saliency.append(0)
                     
-                # multi goal distanceの計算
-                dis = 0.0
-                if self._dis_pre[0] == -1:
-                    self._dis_pre[0] = 0
-                    for j in range(3):
-                        self._dis_pre[0] += rewards[0][5][j]
-                for j in self._target_index_list[0]:
-                    dis += rewards[0][4][j-maps.MAP_TARGET_POINT_INDICATOR]
-                
-                reward[0] += self._dis_pre[0] - dis
-                distance.append(self._dis_pre[0] - dis)
-                self._dis_pre[0] = dis
-                
                 #TAKE_PICTUREが呼び出されたかを検証
-                if ci[0] != -sys.float_info.max:
-                    # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
-                    cover_list = [] 
-                    picture_range_map = self._create_picture_range_map(top_down_map[0], fog_of_war_map[0])
-                        
-                    ci[0] = self._do_take_picture_object(top_map, fog_of_war_map)
+                if saliency[0] == -1:
+                    continue
 
-                    if ci[0] != 0:
-                        # p_kのそれぞれのpicture_range_mapのリスト
-                        pre_fog_of_war_map = [sublist[1] for sublist in self._taken_picture_list[n]]
-                                
-                        # それぞれと閾値より被っているか計算
-                        idx = -1
-                        min_ci = ci[0]
-                        for k in range(len(pre_fog_of_war_map)):
-                            # 閾値よりも被っていたらcover_listにkを追加
-                            if self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k]) == True:
-                                cover_list.append(k)
-                                        
-                            #ciの最小値の写真を探索(１つも被っていない時用)
-                            if min_ci < self._taken_picture_list[0][idx][0]:
-                                idx = k
-                                min_ci = self._taken_picture_list[0][idx][0]
-                                    
-                        # 今までの写真と多くは被っていない時
-                        if len(cover_list) == 0:
-                            #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
-                            if len(self._taken_picture_list[0]) != self._num_picture:
-                                self._taken_picture_list[0].append([ci[n], picture_range_map])
-                                if len(self.config.VIDEO_OPTION) > 0:
-                                    self._taken_picture[0].append(observations["rgb"])
-                                reward[0] += ci[0]
-                                        
-                            #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
-                            else:
-                                # 今回の写真が保存してある写真の１つでもCIが高かったらCIが最小の保存写真と入れ替え
-                                if idx != -1:
-                                    ci_pre = self._taken_picture_list[0][idx][0]
-                                    self._taken_picture_list[0][idx] = [ci[0], picture_range_map]
-                                    if len(self.config.VIDEO_OPTION) > 0:
-                                        self._taken_picture[0][idx] = observations["rgb"]   
-                                    reward[0] += (ci[0] - ci_pre) 
-                                    ci[0] -= ci_pre
-                                else:
-                                    ci[0] = 0.0    
-                                    
-                        # 1つとでも多く被っていた時    
-                        else:
-                            min_idx = -1
-                            min_ci_k = 1000
-                            # 多く被った写真のうち、ciが最小のものを計算
-                            for k in range(len(cover_list)):
-                                idx_k = cover_list[k]
-                                if self._taken_picture_list[0][idx_k][0] < min_ci_k:
-                                    min_ci_k = self._taken_picture_list[0][idx_k][0]
-                                    min_idx = idx_k
-                                        
-                            # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
-                            if self._compare_with_changed_CI(picture_range_map, pre_fog_of_war_map, cover_list, ci[0], min_ci_k, min_idx) == True:
-                                self._taken_picture_list[0][min_idx] = [ci[0], picture_range_map]
-                                if len(self.config.VIDEO_OPTION) > 0:
-                                    self._taken_picture[0][min_idx] = observations["rgb"]   
-                                reward[0] += (ci[0] - min_ci_k)  
-                                ci[0] -= min_ci_k
-                            else:
-                                ci[0] = 0.0
-                else:
-                    ci[0] = 0.0
+                # 2回連続でTAKE_PICTUREをした場合は保存しない
+                if pre_ac[0].item() == action.item():
+                    continue
+
+                # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
+                cover_list = [] 
+                cover_per_list = []
+                picture_range_map = self._create_picture_range_map(top_down_map[0], fog_of_war_map[0])
+                
+                picture_list = self._taken_picture_list[0]
                     
-                reward = torch.tensor(
-                    reward, dtype=torch.float, device=self.device
-                ).unsqueeze(1)
-                #exp_area = np.array(exp_area)
-                exp_area = torch.tensor(
-                    exp_area, dtype=torch.float, device=self.device
-                ).unsqueeze(1)
-                distance = torch.tensor(
-                    distance, dtype=torch.float, device=self.device
-                ).unsqueeze(1)
-                #ci = np.array(ci)
-                ci= torch.tensor(
-                    ci, dtype=torch.float, device=self.device
-                ).unsqueeze(1)
+                pred_description = self.create_description(picture_list)
+                
+                caption = self._create_caption(observations["rgb"])
+                #new_emmbedding = self._create_new_description_embedding(caption)
+                new_emmbedding = self._create_new_image_embedding(observations["rgb"])
 
+                # p_kのそれぞれのpicture_range_mapのリスト
+                pre_fog_of_war_map = [sublist[1] for sublist in picture_list]
+
+                # それぞれと閾値より被っているか計算
+                idx = -1
+                min_sal = saliency[0]
+
+                for k in range(len(pre_fog_of_war_map)):
+                    # 閾値よりも被っていたらcover_listにkを追加
+                    check, per = self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k], threshold=0.1)
+                    cover_per_list.append(per)
+                    if check == True:
+                        cover_list.append(k)
+
+                    #saliencyの最小値の写真を探索(１つも被っていない時用)
+                    if (idx == -1) and (min_sal == picture_list[idx][0]):
+                        idx = -2
+                    elif min_sal > picture_list[idx][0]:
+                        idx = k
+                        min_sal = picture_list[idx][0]
+
+                # 今までの写真と多くは被っていない時
+                if len(cover_list) == 0:
+                    #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
+                    if len(picture_list) != self._num_picture:
+                        picture_list.append([saliency[0], picture_range_map, new_emmbedding, caption, steps])
+                        self._taken_picture[0].append(observations["rgb"])
+                        self._taken_picture_list[0] = picture_list
+                        continue
+
+                    #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
+                    else:
+                        # 今回の写真が保存している写真でsaliencyが最小のものと同じだった場合、写真の類似度が最大のものと交換
+                        if idx == -2:
+                            remove_index = self._cal_remove_index(picture_list, new_emmbedding)
+                            # 入れ替えしない場合
+                            if remove_index == len(picture_list):
+                                continue
+                            picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                            self._taken_picture_list[0] = picture_list
+                            self._taken_picture[0][remove_index] = observations["rgb"]
+                            continue
+
+                        # 今回の写真が保存してある写真の１つでもSaliencyが高かったらSaliencyが最小の保存写真と入れ替え
+                        elif idx != -1:
+                            sal_pre = picture_list[idx][0]
+                            picture_list[idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                            self._taken_picture_list[0] = picture_list
+                            self._taken_picture[0][idx] = observations["rgb"]
+                            continue
+
+                # 1つとでも多く被った場合
+                else:
+                    min_idx = -1
+                    #min_sal_k = 1000
+                    max_sal_k = 0.0
+                    idx_sal = -1
+                    # 多く被った写真のうち、saliencyが最小のものを計算
+                    # 多く被った写真のうち、被っている割合が多い写真とsaliencyを比較
+                    for k in range(len(cover_list)):
+                        idx_k = cover_list[k]
+                        if max_sal_k < cover_per_list[idx_k]:
+                            max_sal_k = cover_per_list[idx_k]
+                            min_idx = idx_k
+                            idx_sal = picture_list[idx_k][0]
+
+                    
+                    # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
+                    #if self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], min_sal_k, min_idx) == True:
+                    res = self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], idx_sal, min_idx)
+                    if res == 0:
+                        picture_list[min_idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                        self._taken_picture_list[0] = picture_list
+                        self._taken_picture[0][min_idx] = observations["rgb"]   
+                        continue
+                    # 被った割合分小さくなったCIと保存写真の中の最小のCIが等しかったら写真の類似度が最大のものを削除
+                    if res == 1:
+                        remove_index = self._cal_remove_index(picture_list, new_emmbedding)
+                        # 入れ替えしない場合
+                        if remove_index == len(picture_list):
+                            continue
+                        picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                        self._taken_picture_list[0] = picture_list
+                        self._taken_picture[0][remove_index] = observations["rgb"]
+                        continue
+                    
+                reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
+                exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
+                pic_sim = torch.tensor(pic_sim, dtype=torch.float, device=current_episode_reward.device).unsqueeze(1)
+                
                 current_episode_reward += reward
                 current_episode_exp_area += exp_area
-                current_episode_distance += distance
-                current_episode_ci += ci
                 envs_to_pause = []
 
                 # episode ended
                 #if not_done_masks[0].item() == 0:  
                 if self.step >= max_step:           
+                    pred_description = self.create_description(self._taken_picture_list[0])
+                    pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
+                    current_episode_picsim[0] += pic_sim[0]
+
+                    for j in range(len(self._taken_picture_list[0])):
+                        sum_saliency[0] += self._taken_picture_list[0][j][0]
+                    sum_saliency[0] /= len(self._taken_picture_list[0])
+                    sum_saliency = torch.tensor(sum_saliency, dtype=torch.float, device=current_episode_reward.device).unsqueeze(1)
+                    current_episode_sum_saliency[0] += sum_saliency[0][0].item()
+                    
+                    # save description
+                    out_path = os.path.join("log/" + date + "/eval/description.txt")
+                    with open(out_path, 'a') as f:
+                        # print関数でファイルに出力する
+                        print(pred_description,file=f)
+                       
                     pbar.update()
                     episode_stats = dict()
                     episode_stats["reward"] = current_episode_reward[0].item()
                     episode_stats["exp_area"] = current_episode_exp_area[0].item()
-                    episode_stats["distance"] = current_episode_distance[0].item()
-                    episode_stats["ci"] = current_episode_ci[0].item()
-                        
+                    episode_stats["pic_sim"] = current_episode_picsim[0].item()
+                    episode_stats["sum_saliency"] = current_episode_sum_saliency[0].item()
+                         
                     episode_stats.update(
                         self._extract_scalars_from_info(infos)
                     )
                     current_episode_reward[0] = 0
                     current_episode_exp_area[0] = 0
-                    current_episode_distance[0] = 0
-                    current_episode_ci[0] = 0
+                    current_episode_picsim[0] = 0
+                    current_episode_sum_saliency[0] = 0
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[
                         (
@@ -676,98 +743,43 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             frame = observations_to_image(observations, infos, action.cpu().numpy())
                             rgb_frames[0].append(frame)
                         picture = rgb_frames[0][-1]
-                        for j in range(2):
-                            rgb_frames[0].append(picture) 
+                        for j in range(20):
+                           rgb_frames[0].append(picture) 
                         metrics=self._extract_scalars_from_info(infos)
-                        name_ci = 0.0
                         
-                        for j in range(len(self._taken_picture_list[0])):
-                            name_ci += self._taken_picture_list[0][j][0]
-                            
-                        name_ci = str(name_ci) + "-" + str(len(stats_episodes))
+                        name_sim = str(len(stats_episodes)) + "-" + str(episode_stats["exp_area"])[:4]
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
                             video_dir=self.config.VIDEO_DIR+"/"+date,
                             images=rgb_frames[0],
-                            #episode_id=current_episodes[0].episode_id,
                             episode_id="aaa",
                             checkpoint_idx=checkpoint_index,
                             metrics=metrics,
-                            tb_writer=None,
-                            name_ci=name_ci,
+                            name_ci=name_sim,
                         )
                         client.speak("ビデオを作成しました。")
             
-                        # Save taken picture
-                        metric_strs = []
-                        in_metric = ['exp_area', 'ci', 'distance']
-                        for k, v in metrics.items():
-                            if k in in_metric:
-                                metric_strs.append(f"{k}={v:.2f}")
-                            
-                        name_p = 0.0  
-                                
-                        for j in range(len(self._taken_picture_list[0])):
-                            eval_picture_top_logger = self.log_manager.createLogWriter("picture_top_" + str(current_episodes[0].episode_id) + "_" + str(j) + "_" + str(checkpoint_index))
-                
-                            for k in range(len(self._taken_picture_list[0][j][1])):
-                                for l in range(len(self._taken_picture_list[0][j][1][0])):
-                                    eval_picture_top_logger.write(str(self._taken_picture_list[0][j][1][k][l]))
-                                eval_picture_top_logger.writeLine()
-                                    
-                            name_p = self._taken_picture_list[0][j][0]
-                            picture_name = "-ckpt=" + str(checkpoint_index) + "-" + str(j) + "-" + str(name_p)
+                        # Save taken picture                     
+                        for j in range(len(self._taken_picture[i])):
+                            picture_name = f"episode={current_episodes[i].episode_id}-{len(stats_episodes)}-{j}"
                             dir_name = "./taken_picture/" + date 
                             if not os.path.exists(dir_name):
                                 os.makedirs(dir_name)
                         
-                            picture = self._taken_picture[0][j]
-                            plt.figure()
-                            ax = plt.subplot(1, 1, 1)
-                            ax.axis("off")
-                            plt.imshow(picture)
-                            plt.subplots_adjust(left=0.1, right=0.95, bottom=0.05, top=0.95)
-                            path = dir_name + "/" + picture_name + ".png"
-                        
-                            plt.savefig(path)
-                            logger.info("Picture created: " + path)
+                            picture = Image.fromarray(np.uint8(self._taken_picture[i][j]))
+                            file_path = dir_name + "/" + picture_name + ".png"
+                            picture.save(file_path)
                                 
                         rgb_frames[0] = []
                             
                     self._taken_picture[0] = []
                     self._taken_picture_list[0] = []
-                    self._target_index_list[0] = [maps.MAP_TARGET_POINT_INDICATOR, maps.MAP_TARGET_POINT_INDICATOR+1, maps.MAP_TARGET_POINT_INDICATOR+2]
-                    self._taken_index_list[0] = []
-                    self._observed_object_ci[0] = [0, 0, 0]
-                    self._dis_pre[0] = -1
                     
                     client.speak("エピソードが終了しました。")
                     break
 
                 # episode continues
                 elif len(self.config.VIDEO_OPTION) > 0:
-                    """
-                    top_map = infos["top_down_map"]["map"]
-                    fog = infos["top_down_map"]["fog_of_war_mask"]
-                    log_manager = LogManager()
-                    log_manager.setLogDirectory("top_down_map")
-                    log_writer = log_manager.createLogWriter("map_" + str(self.step))
-                    fog_log_writer = log_manager.createLogWriter("fog_" + str(self.step))
-                    
-                    print("top_down: " + str(top_map.shape))
-                    for x in range(top_map.shape[0]):
-                        for y in range(top_map.shape[1]):
-                            log_writer.write(str(top_map[x][y]))
-                        log_writer.writeLine()
-                        
-                    print("fog: " + str(fog.shape))
-                    for x in range(fog.shape[0]):
-                        for y in range(fog.shape[1]):
-                            fog_log_writer.write(str(fog[x][y]))
-                        fog_log_writer.writeLine()
-                    """
-                    
-                    
                     frame = observations_to_image(observations, infos, action.cpu().numpy())
                     for _ in range(10):
                         rgb_frames[0].append(frame)
@@ -778,8 +790,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     not_done_masks,
                     current_episode_reward,
                     current_episode_exp_area,
-                    current_episode_distance,
-                    current_episode_ci,
+                    current_episode_picsim,
+                    current_episode_sum_saliency,
                     prev_actions,
                     batch,
                     rgb_frames,
@@ -790,8 +802,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     not_done_masks,
                     current_episode_reward,
                     current_episode_exp_area,
-                    current_episode_distance,
-                    current_episode_ci,
+                    current_episode_picsim,
+                    current_episode_sum_saliency,
                     prev_actions,
                     batch,
                     rgb_frames,
@@ -799,7 +811,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
             num_episodes = len(stats_episodes)
             
-            """
             aggregated_stats = dict()
             for stat_key in next(iter(stats_episodes.values())).keys():
                 aggregated_stats[stat_key] = (
@@ -810,19 +821,18 @@ class PPOTrainerO(BaseRLTrainerOracle):
             for k, v in aggregated_stats.items():
                 logger.info(f"Average episode {k}: {v:.4f}")
             
-
-
             step_id = checkpoint_index
             if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
                 step_id = ckpt_dict["extra_state"]["step"]
             
-            #eval_reward_logger.writeLine(str(step_id) + "," + str(aggregated_stats["reward"]))
+            eval_reward_logger.writeLine(str(step_id) + "," + str(aggregated_stats["reward"]))
 
             metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
 
-            logger.info("CI:" + str(metrics["ci"]))
-            #eval_metrics_logger.writeLine(str(step_id) + "," + str(metrics["ci"]) + "," + str(metrics["exp_area"]) + "," + str(metrics["distance"]) + "," + str(metrics["raw_metrics.agent_path_length"]))
-            """
+            logger.info("Similarity: " + str(metrics["similarity"]))
+            logger.info("Pic_Sim: " + str(metrics["pic_sim"]))
+            logger.info("Sum Saliency: " + str(metrics["sum_saliency"]))
+            eval_metrics_logger.writeLine(str(step_id)+","+str(metrics["exp_area"])+","+str(metrics["similarity"])+","+str(metrics["pic_sim"])+","+str(metrics["each_sim"])+","+str(metrics["sum_saliency"])+","+str(metrics["raw_metrics.agent_path_length"]))
 
             self.env.close()
             client.return_shelf()

@@ -26,7 +26,7 @@ def main():
     if run_type == "eval":
         datadate = "23-10-26 18-29-56"
         datadate = "23-12-26 04-22-23"
-        #datadate = "23-10-03 16-04-23"
+        datadate = "24-04-26 00-36-56"
 
     config = get_config(exp_config)
     
