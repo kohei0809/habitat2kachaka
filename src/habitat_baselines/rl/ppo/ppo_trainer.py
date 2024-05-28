@@ -13,8 +13,7 @@ from collections import defaultdict
 from typing import Any, Dict, List
 import pyrealsense2 as rs
 import clip
-from sentence_transformers import SentenceTransformer, util
-from lavis.models import load_model_and_preprocess
+from sentence_transformers import util
 
 import numpy as np
 import torch
@@ -37,6 +36,13 @@ from habitat_baselines.rl.ppo import PPOOracle, ProposedPolicyOracle
 
 import kachaka_api
 sys.path.append(f"/home/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
+
+from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN, DEFAULT_IM_START_TOKEN, DEFAULT_IM_END_TOKEN
+from llava.conversation import conv_templates, SeparatorStyle
+from llava.model.builder import load_pretrained_model
+from llava.utils import disable_torch_init
+from llava.mm_utils import tokenizer_image_token, get_model_name_from_path
+from transformers import TextStreamer
 
 
 
@@ -453,9 +459,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
             self._taken_picture_list = []
             self._taken_picture_list.append([])
-            
-            # Sentence-BERTモデルの読み込み
-            self.bert_model = SentenceTransformer('all-MiniLM-L6-v2')
             
             # LLaVA model
             load_4bit = True
