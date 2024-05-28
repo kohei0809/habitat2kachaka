@@ -4,7 +4,7 @@ import os
 import numpy as np
 from utils import move
 
-sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
+sys.path.append(f"/home/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
 import kachaka_api
 
 

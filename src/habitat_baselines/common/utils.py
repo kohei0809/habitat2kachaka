@@ -149,7 +149,7 @@ def generate_video(
     checkpoint_idx: int,
     metrics: Dict[str, float],
     name_ci = None,
-    fps: int = 5,
+    fps: int = 20,
 ) -> None:
     r"""Generate video according to specified information.
 
@@ -184,7 +184,7 @@ def generate_video(
     
     if "disk" in video_option:
         assert video_dir is not None
-        images_to_video(images, video_dir, video_name)
+        images_to_video(images, video_dir, video_name, fps=fps)
 
 
 def quat_from_angle_axis(theta: float, axis: np.ndarray) -> np.quaternion:

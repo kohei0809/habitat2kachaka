@@ -208,3 +208,6 @@ result/
 .keep
 *.png
 *.jpeg
+*.pth
+cpt/*
+token.txt

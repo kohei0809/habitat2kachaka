@@ -6,12 +6,16 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 
 
-def preprocess_img(img_dir, channels=3):
+def preprocess_img(img_dir="", image=None, channels=3):
 
-    if channels == 1:
-        img = cv2.imread(img_dir, 0)
-    elif channels == 3:
-        img = cv2.imread(img_dir)
+    img = None
+    if image is not None:
+        img = image
+    else:
+        if channels == 1:
+            img = cv2.imread(img_dir, 0)
+        elif channels == 3:
+            img = cv2.imread(img_dir)
 
     shape_r = 288
     shape_c = 384
@@ -40,9 +44,13 @@ def preprocess_img(img_dir, channels=3):
     return img_padded
 
 
-def postprocess_img(pred, org_dir):
+def postprocess_img(pred, org_dir="", org_image=None):
     pred = np.array(pred)
-    org = cv2.imread(org_dir, 0)
+    org = None
+    if org_image is not None:
+        org = org_image
+    else:
+        org = cv2.imread(org_dir, 0)
     shape_r = org.shape[0]
     shape_c = org.shape[1]
     predictions_shape = pred.shape

@@ -4,24 +4,20 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
-from habitat_baselines.rl.ppo.ppo import PPONonOracle
 import json
 import os
 import cv2
-import time
-import pathlib
 import sys
 from PIL import Image
-from collections import defaultdict, deque
-from typing import Any, Dict, List, Optional
+from collections import defaultdict
+from typing import Any, Dict, List
 import pyrealsense2 as rs
 import clip
+from sentence_transformers import SentenceTransformer, util
+from lavis.models import load_model_and_preprocess
 
-from matplotlib import pyplot as plt
-import math
 import numpy as np
 import torch
-import torch.nn.functional as F
 import tqdm
 
 from habitat import Config
@@ -30,22 +26,17 @@ from habitat.utils.visualizations.utils import observations_to_image
 from habitat_baselines.common.base_trainer import BaseRLTrainerOracle
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_env
-from habitat_baselines.common.environments import get_env_class
 from habitat_baselines.common.rollout_storage import RolloutStorageOracle
-from habitat_baselines.common.tensorboard_utils import TensorboardWriter
 from habitat_baselines.common.utils import (
     batch_obs,
     generate_video,
     linear_decay,
     poll_checkpoint_folder
 )
-from habitat_baselines.rl.ppo import PPONonOracle, PPOOracle, ProposedPolicyOracle
-from utils.log_manager import LogManager
-from utils.log_writer import LogWriter
-from habitat.utils.visualizations import fog_of_war, maps
+from habitat_baselines.rl.ppo import PPOOracle, ProposedPolicyOracle
 
 import kachaka_api
-sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
+sys.path.append(f"/home/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
 
 
 
@@ -371,7 +362,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
     #def _exec_kachaka(self, log_manager, date, ip) -> None:
     def _exec_kachaka(self, date, ip) -> None:
-        max_step = 5
+        max_step = 500
         #self.cap = cv2.VideoCapture(0)
         #_, frame = self.cap.read()
         #cv2.imshow('webカメラ', frame)
@@ -511,6 +502,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 os.makedirs(self.config.VIDEO_DIR+"/"+date, exist_ok=True)
 
             pbar = tqdm.tqdm(total=self.config.TEST_EPISODE_COUNT)
+            episode_stats = dict()
             self.actor_critic.eval()
             
             self.step = 0
@@ -564,123 +556,125 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 fog_of_war_map = []
                 top_down_map = [] 
                 sum_saliency = []
-                n_envs = 1
                 
-                reward.append(rewards[i][0])
-                saliency.append(rewards[i][1])
+                reward.append(rewards[0])
+                saliency.append(rewards[1])
                 pic_sim.append(0)
-                exp_area.append(rewards[i][2]-rewards[i][3])
-                exp_area_pre.append(rewards[i][3])
-                fog_of_war_map.append(infos[i]["picture_range_map"]["fog_of_war_mask"])
-                top_down_map.append(infos[i]["picture_range_map"]["map"])
+                exp_area.append(rewards[2]-rewards[3])
+                exp_area_pre.append(rewards[3])
+                fog_of_war_map.append(infos["picture_range_map"]["fog_of_war_mask"])
+                top_down_map.append(infos["picture_range_map"]["map"])
                 sum_saliency.append(0)
                     
                 #TAKE_PICTUREが呼び出されたかを検証
                 if saliency[0] == -1:
-                    continue
+                    pass
 
                 # 2回連続でTAKE_PICTUREをした場合は保存しない
-                if pre_ac[0].item() == action.item():
-                    continue
+                elif pre_ac[0].item() == action.item():
+                    pass
 
-                # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
-                cover_list = [] 
-                cover_per_list = []
-                picture_range_map = self._create_picture_range_map(top_down_map[0], fog_of_war_map[0])
-                
-                picture_list = self._taken_picture_list[0]
+                else:
+                    # 今回撮ったpicture(p_n)が保存してあるpicture(p_k)とかぶっているkを保存
+                    cover_list = [] 
+                    cover_per_list = []
+                    picture_range_map = self._create_picture_range_map(top_down_map[0], fog_of_war_map[0])
                     
-                pred_description = self.create_description(picture_list)
-                
-                caption = self._create_caption(observations["rgb"])
-                #new_emmbedding = self._create_new_description_embedding(caption)
-                new_emmbedding = self._create_new_image_embedding(observations["rgb"])
+                    picture_list = self._taken_picture_list[0]
+                        
+                    pred_description = self.create_description(picture_list)
+                    
+                    caption = self._create_caption(observations["rgb"])
+                    #new_emmbedding = self._create_new_description_embedding(caption)
+                    new_emmbedding = self._create_new_image_embedding(observations["rgb"])
 
-                # p_kのそれぞれのpicture_range_mapのリスト
-                pre_fog_of_war_map = [sublist[1] for sublist in picture_list]
+                    # p_kのそれぞれのpicture_range_mapのリスト
+                    pre_fog_of_war_map = [sublist[1] for sublist in picture_list]
 
-                # それぞれと閾値より被っているか計算
-                idx = -1
-                min_sal = saliency[0]
+                    # それぞれと閾値より被っているか計算
+                    idx = -1
+                    min_sal = saliency[0]
 
-                for k in range(len(pre_fog_of_war_map)):
-                    # 閾値よりも被っていたらcover_listにkを追加
-                    check, per = self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k], threshold=0.1)
-                    cover_per_list.append(per)
-                    if check == True:
-                        cover_list.append(k)
+                    for k in range(len(pre_fog_of_war_map)):
+                        # 閾値よりも被っていたらcover_listにkを追加
+                        check, per = self._check_percentage_of_fog(picture_range_map, pre_fog_of_war_map[k], threshold=0.1)
+                        cover_per_list.append(per)
+                        if check == True:
+                            cover_list.append(k)
 
-                    #saliencyの最小値の写真を探索(１つも被っていない時用)
-                    if (idx == -1) and (min_sal == picture_list[idx][0]):
-                        idx = -2
-                    elif min_sal > picture_list[idx][0]:
-                        idx = k
-                        min_sal = picture_list[idx][0]
+                        #saliencyの最小値の写真を探索(１つも被っていない時用)
+                        if (idx == -1) and (min_sal == picture_list[idx][0]):
+                            idx = -2
+                        elif min_sal > picture_list[idx][0]:
+                            idx = k
+                            min_sal = picture_list[idx][0]
 
-                # 今までの写真と多くは被っていない時
-                if len(cover_list) == 0:
-                    #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
-                    if len(picture_list) != self._num_picture:
-                        picture_list.append([saliency[0], picture_range_map, new_emmbedding, caption, steps])
-                        self._taken_picture[0].append(observations["rgb"])
-                        self._taken_picture_list[0] = picture_list
-                        continue
+                    # 今までの写真と多くは被っていない時
+                    if len(cover_list) == 0:
+                        #範囲が多く被っていなくて、self._num_picture回未満写真を撮っていたらそのまま保存
+                        if len(picture_list) != self._num_picture:
+                            picture_list.append([saliency[0], picture_range_map, new_emmbedding, caption])
+                            self._taken_picture[0].append(observations["rgb"])
+                            self._taken_picture_list[0] = picture_list
+                            print("save picture: 0")
 
-                    #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
+                        #範囲が多く被っていなくて、self._num_picture回以上写真を撮っていたら
+                        else:
+                            # 今回の写真が保存している写真でsaliencyが最小のものと同じだった場合、写真の類似度が最大のものと交換
+                            if idx == -2:
+                                remove_index = self._cal_remove_index(picture_list, new_emmbedding)
+                                # 入れ替えしない場合
+                                if remove_index == len(picture_list):
+                                    print("not save picture: 0")
+                                else:
+                                    picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                                    self._taken_picture_list[0] = picture_list
+                                    self._taken_picture[0][remove_index] = observations["rgb"]
+                                    print("change picture: 0")
+
+                            # 今回の写真が保存してある写真の１つでもSaliencyが高かったらSaliencyが最小の保存写真と入れ替え
+                            elif idx != -1:
+                                picture_list[idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                                self._taken_picture_list[0] = picture_list
+                                self._taken_picture[0][idx] = observations["rgb"]
+                                print("change picture: 1")
+
+                    # 1つとでも多く被った場合
                     else:
-                        # 今回の写真が保存している写真でsaliencyが最小のものと同じだった場合、写真の類似度が最大のものと交換
-                        if idx == -2:
+                        min_idx = -1
+                        #min_sal_k = 1000
+                        max_sal_k = 0.0
+                        idx_sal = -1
+                        # 多く被った写真のうち、saliencyが最小のものを計算
+                        # 多く被った写真のうち、被っている割合が多い写真とsaliencyを比較
+                        for k in range(len(cover_list)):
+                            idx_k = cover_list[k]
+                            if max_sal_k < cover_per_list[idx_k]:
+                                max_sal_k = cover_per_list[idx_k]
+                                min_idx = idx_k
+                                idx_sal = picture_list[idx_k][0]
+
+                        # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
+                        #if self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], min_sal_k, min_idx) == True:
+                        res = self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], idx_sal, min_idx)
+                        if res == 0:
+                            picture_list[min_idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                            self._taken_picture_list[0] = picture_list
+                            self._taken_picture[0][min_idx] = observations["rgb"]  
+                            print("change picture: 2") 
+                        # 被った割合分小さくなったCIと保存写真の中の最小のCIが等しかったら写真の類似度が最大のものを削除
+                        elif res == 1:
                             remove_index = self._cal_remove_index(picture_list, new_emmbedding)
                             # 入れ替えしない場合
                             if remove_index == len(picture_list):
-                                continue
-                            picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
-                            self._taken_picture_list[0] = picture_list
-                            self._taken_picture[0][remove_index] = observations["rgb"]
-                            continue
-
-                        # 今回の写真が保存してある写真の１つでもSaliencyが高かったらSaliencyが最小の保存写真と入れ替え
-                        elif idx != -1:
-                            sal_pre = picture_list[idx][0]
-                            picture_list[idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
-                            self._taken_picture_list[0] = picture_list
-                            self._taken_picture[0][idx] = observations["rgb"]
-                            continue
-
-                # 1つとでも多く被った場合
-                else:
-                    min_idx = -1
-                    #min_sal_k = 1000
-                    max_sal_k = 0.0
-                    idx_sal = -1
-                    # 多く被った写真のうち、saliencyが最小のものを計算
-                    # 多く被った写真のうち、被っている割合が多い写真とsaliencyを比較
-                    for k in range(len(cover_list)):
-                        idx_k = cover_list[k]
-                        if max_sal_k < cover_per_list[idx_k]:
-                            max_sal_k = cover_per_list[idx_k]
-                            min_idx = idx_k
-                            idx_sal = picture_list[idx_k][0]
-
-                    
-                    # 被った割合分小さくなったCIでも保存写真の中の最小のCIより大きかったら交換
-                    #if self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], min_sal_k, min_idx) == True:
-                    res = self._compareWithChangedSal(picture_range_map, pre_fog_of_war_map, cover_list, saliency[0], idx_sal, min_idx)
-                    if res == 0:
-                        picture_list[min_idx] = [saliency[0], picture_range_map, new_emmbedding, caption]
-                        self._taken_picture_list[0] = picture_list
-                        self._taken_picture[0][min_idx] = observations["rgb"]   
-                        continue
-                    # 被った割合分小さくなったCIと保存写真の中の最小のCIが等しかったら写真の類似度が最大のものを削除
-                    if res == 1:
-                        remove_index = self._cal_remove_index(picture_list, new_emmbedding)
-                        # 入れ替えしない場合
-                        if remove_index == len(picture_list):
-                            continue
-                        picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
-                        self._taken_picture_list[0] = picture_list
-                        self._taken_picture[0][remove_index] = observations["rgb"]
-                        continue
+                                print("not save picture: 1")
+                            else:
+                                picture_list[remove_index] = [saliency[0], picture_range_map, new_emmbedding, caption]
+                                self._taken_picture_list[0] = picture_list
+                                self._taken_picture[0][remove_index] = observations["rgb"]
+                                print("change picture: 3")
+                        else:
+                            print("not save picture: 2")
                     
                 reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
                 exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
@@ -689,97 +683,9 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 current_episode_reward += reward
                 current_episode_exp_area += exp_area
                 envs_to_pause = []
-
-                # episode ended
-                #if not_done_masks[0].item() == 0:  
-                if self.step >= max_step:           
-                    pred_description = self.create_description(self._taken_picture_list[0])
-                    pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
-                    current_episode_picsim[0] += pic_sim[0]
-
-                    for j in range(len(self._taken_picture_list[0])):
-                        sum_saliency[0] += self._taken_picture_list[0][j][0]
-                    sum_saliency[0] /= len(self._taken_picture_list[0])
-                    sum_saliency = torch.tensor(sum_saliency, dtype=torch.float, device=current_episode_reward.device).unsqueeze(1)
-                    current_episode_sum_saliency[0] += sum_saliency[0][0].item()
-                    
-                    # save description
-                    out_path = os.path.join("log/" + date + "/eval/description.txt")
-                    with open(out_path, 'a') as f:
-                        # print関数でファイルに出力する
-                        print(pred_description,file=f)
-                       
-                    pbar.update()
-                    episode_stats = dict()
-                    episode_stats["reward"] = current_episode_reward[0].item()
-                    episode_stats["exp_area"] = current_episode_exp_area[0].item()
-                    episode_stats["pic_sim"] = current_episode_picsim[0].item()
-                    episode_stats["sum_saliency"] = current_episode_sum_saliency[0].item()
-                         
-                    episode_stats.update(
-                        self._extract_scalars_from_info(infos)
-                    )
-                    current_episode_reward[0] = 0
-                    current_episode_exp_area[0] = 0
-                    current_episode_picsim[0] = 0
-                    current_episode_sum_saliency[0] = 0
-                    # use scene_id + episode_id as unique id for storing stats
-                    stats_episodes[
-                        (
-                            #current_episodes[0].scene_id,
-                            #current_episodes[0].episode_id,
-                            "aaa", "aaa"
-                        )
-                    ] = episode_stats
-                        
-                    raw_metrics_episodes[
-                        #current_episodes[0].scene_id + '.' + 
-                        #current_episodes[0].episode_id
-                        "aaa.aaa"
-                    ] = infos["raw_metrics"]
-
-                    if len(self.config.VIDEO_OPTION) > 0:
-                        if len(rgb_frames[0]) == 0:
-                            frame = observations_to_image(observations, infos, action.cpu().numpy())
-                            rgb_frames[0].append(frame)
-                        picture = rgb_frames[0][-1]
-                        for j in range(20):
-                           rgb_frames[0].append(picture) 
-                        metrics=self._extract_scalars_from_info(infos)
-                        
-                        name_sim = str(len(stats_episodes)) + "-" + str(episode_stats["exp_area"])[:4]
-                        generate_video(
-                            video_option=self.config.VIDEO_OPTION,
-                            video_dir=self.config.VIDEO_DIR+"/"+date,
-                            images=rgb_frames[0],
-                            episode_id="aaa",
-                            checkpoint_idx=checkpoint_index,
-                            metrics=metrics,
-                            name_ci=name_sim,
-                        )
-                        client.speak("ビデオを作成しました。")
-            
-                        # Save taken picture                     
-                        for j in range(len(self._taken_picture[i])):
-                            picture_name = f"episode={current_episodes[i].episode_id}-{len(stats_episodes)}-{j}"
-                            dir_name = "./taken_picture/" + date 
-                            if not os.path.exists(dir_name):
-                                os.makedirs(dir_name)
-                        
-                            picture = Image.fromarray(np.uint8(self._taken_picture[i][j]))
-                            file_path = dir_name + "/" + picture_name + ".png"
-                            picture.save(file_path)
-                                
-                        rgb_frames[0] = []
-                            
-                    self._taken_picture[0] = []
-                    self._taken_picture_list[0] = []
-                    
-                    client.speak("エピソードが終了しました。")
-                    break
-
+                
                 # episode continues
-                elif len(self.config.VIDEO_OPTION) > 0:
+                if len(self.config.VIDEO_OPTION) > 0:
                     frame = observations_to_image(observations, infos, action.cpu().numpy())
                     for _ in range(10):
                         rgb_frames[0].append(frame)
@@ -808,31 +714,162 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     batch,
                     rgb_frames,
                 )
+                
+                if self.step % 50 == 0:
+                    pred_description = self.create_description(self._taken_picture_list[0])
+                    pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
+                    current_episode_picsim[0] += pic_sim[0]
 
-            num_episodes = len(stats_episodes)
-            
-            aggregated_stats = dict()
-            for stat_key in next(iter(stats_episodes.values())).keys():
-                aggregated_stats[stat_key] = (
-                    sum([v[stat_key] for v in stats_episodes.values()])
-                    / num_episodes
+                    for j in range(len(self._taken_picture_list[0])):
+                        sum_saliency[0] += self._taken_picture_list[0][j][0]
+                    if len(self._taken_picture_list[0]) != 0:
+                        sum_saliency[0] /= len(self._taken_picture_list[0])
+                    sum_saliency = torch.tensor(sum_saliency, dtype=torch.float, device=current_episode_reward.device).unsqueeze(1)
+                    current_episode_sum_saliency[0] += sum_saliency[0][0].item()
+                            
+                    # save description
+                    out_path = os.path.join("output_descriptions/description.txt")
+                    with open(out_path, 'a') as f:
+                        # print関数でファイルに出力する
+                        print(self.step,file=f)
+                        print(pred_description,file=f)
+                            
+                    pbar.update()
+                    episode_stats = dict()
+                    episode_stats["reward"] = current_episode_reward[0].item()
+                    episode_stats["exp_area"] = current_episode_exp_area[0].item()
+                    episode_stats["pic_sim"] = current_episode_picsim[0].item()
+                    episode_stats["sum_saliency"] = current_episode_sum_saliency[0].item()
+                                
+                    episode_stats.update(
+                        self._extract_scalars_from_info(infos)
+                    )
+                    # use scene_id + episode_id as unique id for storing stats
+                    stats_episodes[
+                        (
+                            #current_episodes[0].scene_id,
+                            #current_episodes[0].episode_id,
+                            "aaa", "aaa"
+                        )
+                    ] = episode_stats
+                                
+                    raw_metrics_episodes[
+                        #current_episodes[0].scene_id + '.' + 
+                        #current_episodes[0].episode_id
+                        "aaa.aaa"
+                    ] = infos["raw_metrics"]
+
+                    if len(self.config.VIDEO_OPTION) > 0:
+                        if len(rgb_frames[0]) == 0:
+                            frame = observations_to_image(observations, infos, action.cpu().numpy())
+                            rgb_frames[0].append(frame)
+                        picture = rgb_frames[0][-1]
+                        for j in range(20):
+                            rgb_frames[0].append(picture) 
+                        metrics=self._extract_scalars_from_info(infos)
+                                
+                        name_sim = str(len(stats_episodes)) + "-" + str(episode_stats["exp_area"])[:4] + "-" + str(self.step)
+                        generate_video(
+                            video_option=self.config.VIDEO_OPTION,
+                            video_dir=self.config.VIDEO_DIR+"/"+date,
+                            images=rgb_frames[0],
+                            episode_id="aaa",
+                            checkpoint_idx=checkpoint_index,
+                            metrics=metrics,
+                            name_ci=name_sim,
+                        )
+                        client.speak("途中経過のビデオを作成しました。")
+                        
+                        # Save taken picture                     
+                        for j in range(len(self._taken_picture[i])):
+                            picture_name = f"episode=aaa-{len(stats_episodes)}-{j}-{self.step}"
+                            dir_name = "./taken_picture/" + date 
+                            if not os.path.exists(dir_name):
+                                os.makedirs(dir_name)
+                                
+                            picture = Image.fromarray(np.uint8(self._taken_picture[i][j]))
+                            file_path = dir_name + "/" + picture_name + ".png"
+                            picture.save(file_path)
+
+            # episode ended
+            pred_description = self.create_description(self._taken_picture_list[0])
+            pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
+            current_episode_picsim[0] += pic_sim[0]
+
+            for j in range(len(self._taken_picture_list[0])):
+                sum_saliency[0] += self._taken_picture_list[0][j][0]
+            if len(self._taken_picture_list[0]) != 0:
+                sum_saliency[0] /= len(self._taken_picture_list[0])
+            sum_saliency = torch.tensor(sum_saliency, dtype=torch.float, device=current_episode_reward.device).unsqueeze(1)
+            current_episode_sum_saliency[0] += sum_saliency[0][0].item()
+                    
+            # save description
+            out_path = os.path.join("output_descriptions/description.txt")
+            with open(out_path, 'a') as f:
+                # print関数でファイルに出力する
+                print(pred_description,file=f)
+                       
+            pbar.update()
+            episode_stats = dict()
+            episode_stats["reward"] = current_episode_reward[0].item()
+            episode_stats["exp_area"] = current_episode_exp_area[0].item()
+            episode_stats["pic_sim"] = current_episode_picsim[0].item()
+            episode_stats["sum_saliency"] = current_episode_sum_saliency[0].item()
+                         
+            episode_stats.update(
+                self._extract_scalars_from_info(infos)
+            )
+            # use scene_id + episode_id as unique id for storing stats
+            stats_episodes[
+                (
+                    #current_episodes[0].scene_id,
+                    #current_episodes[0].episode_id,
+                    "aaa", "aaa"
                 )
+            ] = episode_stats
+                        
+            raw_metrics_episodes[
+                #current_episodes[0].scene_id + '.' + 
+                #current_episodes[0].episode_id
+                "aaa.aaa"
+            ] = infos["raw_metrics"]
 
-            for k, v in aggregated_stats.items():
-                logger.info(f"Average episode {k}: {v:.4f}")
+            if len(self.config.VIDEO_OPTION) > 0:
+                if len(rgb_frames[0]) == 0:
+                    frame = observations_to_image(observations, infos, action.cpu().numpy())
+                    rgb_frames[0].append(frame)
+                picture = rgb_frames[0][-1]
+                for j in range(20):
+                    rgb_frames[0].append(picture) 
+                metrics=self._extract_scalars_from_info(infos)
+                        
+                name_sim = str(len(stats_episodes)) + "-" + str(episode_stats["exp_area"])[:4]
+                generate_video(
+                    video_option=self.config.VIDEO_OPTION,
+                    video_dir=self.config.VIDEO_DIR+"/"+date,
+                    images=rgb_frames[0],
+                    episode_id="aaa",
+                    checkpoint_idx=checkpoint_index,
+                    metrics=metrics,
+                    name_ci=name_sim,
+                )
+                client.speak("ビデオを作成しました。")
             
-            step_id = checkpoint_index
-            if "extra_state" in ckpt_dict and "step" in ckpt_dict["extra_state"]:
-                step_id = ckpt_dict["extra_state"]["step"]
+                # Save taken picture                     
+                for j in range(len(self._taken_picture[i])):
+                    picture_name = f"episode=aaa-{len(stats_episodes)}-{j}"
+                    dir_name = "./taken_picture/" + date 
+                    if not os.path.exists(dir_name):
+                        os.makedirs(dir_name)
+                        
+                    picture = Image.fromarray(np.uint8(self._taken_picture[i][j]))
+                    file_path = dir_name + "/" + picture_name + ".png"
+                    picture.save(file_path)
             
-            eval_reward_logger.writeLine(str(step_id) + "," + str(aggregated_stats["reward"]))
-
-            metrics = {k: v for k, v in aggregated_stats.items() if k != "reward"}
-
-            logger.info("Similarity: " + str(metrics["similarity"]))
-            logger.info("Pic_Sim: " + str(metrics["pic_sim"]))
-            logger.info("Sum Saliency: " + str(metrics["sum_saliency"]))
-            eval_metrics_logger.writeLine(str(step_id)+","+str(metrics["exp_area"])+","+str(metrics["similarity"])+","+str(metrics["pic_sim"])+","+str(metrics["each_sim"])+","+str(metrics["sum_saliency"])+","+str(metrics["raw_metrics.agent_path_length"]))
+            client.speak("エピソードが終了しました。")
+                    
+            logger.info("Pic_Sim: " + str(episode_stats["pic_sim"]))
+            logger.info("Sum Saliency: " + str(episode_stats["sum_saliency"]))
 
             self.env.close()
             client.return_shelf()

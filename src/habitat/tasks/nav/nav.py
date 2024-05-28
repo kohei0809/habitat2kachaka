@@ -47,6 +47,9 @@ from habitat.tasks.utils import (
 )
 from habitat.utils.visualizations import fog_of_war, maps
 
+from TranSalNet.utils.data_process import preprocess_img, postprocess_img
+from TranSalNet.TranSalNet_Dense import TranSalNet
+
 cv2 = try_cv2_import()
 
 
@@ -76,28 +79,31 @@ def merge_sim_episode_config(
 def move(client, x, y, theta):
     print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
     
-    get_thread = threading.Thread(target=client.move_to_pose, args=(x, y, theta))
-    get_thread.start()
-    get_thread.join(10)  # get関数の終了を待つ（最大10秒）
+    while True:
+        get_thread = threading.Thread(target=client.move_to_pose, args=(x, y, theta))
+        get_thread.start()
+        get_thread.join(10)  # get関数の終了を待つ（最大10秒）
 
-    if get_thread.is_alive():
-        print("move関数は10秒以上かかりました。強制終了します。")
-        client.speak("move関数は10秒以上かかりました。強制終了します。")
-    
-    #client.move_to_pose(x, y, theta)
+        if get_thread.is_alive():
+            print("move関数は10秒以上かかりました。強制終了します。")
+            client.speak("move関数は10秒以上かかりました。強制終了します。")
+            break
+        
+        #client.move_to_pose(x, y, theta)
 
-    result = client.get_last_command_result()[0]
-    if result.success:
-        #print("Success!")
-        pass
-    else:
-        with open(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
-            error_codes = json.load(f)
-        for error_code in error_codes:
-            if int(error_code["code"]) == result.error_code:
-                error_title = error_code["title"]
-                error_description = error_code["description"]
-                print(f"Failure: {error_title}\n{error_description}")
+        result = client.get_last_command_result()[0]
+        if result.success:
+            #print("Success!")
+            break
+        else:
+            with open(f"/home/{os.environ['USER']}/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
+                error_codes = json.load(f)
+            for error_code in error_codes:
+                if int(error_code["code"]) == result.error_code:
+                    error_title = error_code["title"]
+                    error_description = error_code["description"]
+                    print(f"Failure: {error_title}\n{error_description}")
+            client.speak("再実行します。")
 
 
 @attr.s(auto_attribs=True, kw_only=True)
@@ -528,11 +534,11 @@ class Saliency(Measure):
     def get_metric(self):
         return self._metric
 
-    def reset_metric(self, *args: Any, episode, task, **kwargs: Any):
+    def reset_metric(self, *args: Any, task, **kwargs: Any):
         task.measurements.check_measure_dependencies(self.uuid, [Picture.cls_uuid])
-        self.update_metric(*args, episode=episode, task=task, **kwargs)
+        self.update_metric(*args, task=task, **kwargs)
     
-    def update_metric(self, *args: Any, episode, task: EmbodiedTask, **kwargs: Any):
+    def update_metric(self, *args: Any, task: EmbodiedTask, **kwargs: Any):
         take_picture = task.measurements.measures[
             Picture.cls_uuid
         ].get_metric()
@@ -562,13 +568,17 @@ class Saliency(Measure):
         pic = toPIL(pred_saliency.squeeze())
 
         pred_saliency = postprocess_img(pic, org_image=obs)
+        high_saliency = pred_saliency[pred_saliency >= 224]
         # 0を削除
         non_zero_pred_saliency = pred_saliency[pred_saliency != 0]
         flag = (stats.mode(non_zero_pred_saliency).mode == 1)
+        return high_saliency.shape[0]
+        """
         if flag == True:
             return self._count_saliency_regions(pred_saliency)
         else:
             return -1
+        """
 
     def _count_saliency_regions(self, saliency_map, threshold=192):
         # 二値化
@@ -864,8 +874,8 @@ class TopDownMap(Measure):
         return top_down_map
     
     def _clip_map(self, _map, fog=False):
-        print(f"clip: {self._ind_y_min - self._grid_delta} ~ {self._ind_y_max + self._grid_delta}")
-        print(f"clip: {self._ind_x_min - self._grid_delta} ~ {self._ind_x_max + self._grid_delta}")
+        #print(f"clip: {self._ind_y_min - self._grid_delta} ~ {self._ind_y_max + self._grid_delta}")
+        #print(f"clip: {self._ind_x_min - self._grid_delta} ~ {self._ind_x_max + self._grid_delta}")
         return _map[
             self._ind_y_min - self._grid_delta : self._ind_y_max + self._grid_delta,
             self._ind_x_min - self._grid_delta : self._ind_x_max + self._grid_delta,

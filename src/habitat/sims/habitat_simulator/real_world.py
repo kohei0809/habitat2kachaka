@@ -96,7 +96,7 @@ class RealRGBSensor(Sensor):
             low=0,
             high=np.iinfo(np.int64).max,
             shape=(self.config.HEIGHT, self.config.WIDTH, RGBSENSOR_DIMENSION),
-            dtype=np.int64,
+            dtype=np.uint8,
         )
 
     def get_observation(self) -> Any:
@@ -126,7 +126,7 @@ class RealRGBSensor(Sensor):
         
         rgb_obs = cv2.resize(color_image, size[0:2])
           
-        rgb_obs = rgb_obs.astype(np.float64)
+        rgb_obs = rgb_obs.astype(np.uint8)
         return rgb_obs
 
 
