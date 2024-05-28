@@ -561,31 +561,38 @@ class Saliency(Measure):
         else:
             img = img.type(torch.FloatTensor).to(self.device)
         
-        #img = img.type(torch.FloatTensor)
-
-        pred_saliency = self.transalnet_model(img)
+        raw_saliency, pred_saliency = self.transalnet_model(img)
         toPIL = transforms.ToPILImage()
         pic = toPIL(pred_saliency.squeeze())
 
         pred_saliency = postprocess_img(pic, org_image=obs)
-        high_saliency = pred_saliency[pred_saliency >= 224]
+        
         # 0を削除
         non_zero_pred_saliency = pred_saliency[pred_saliency != 0]
         flag = (stats.mode(non_zero_pred_saliency).mode == 1)
-        return high_saliency.shape[0]
-        """
         if flag == True:
-            return self._count_saliency_regions(pred_saliency)
+            count_sal = raw_saliency[raw_saliency > 0].shape[0]
+            sem_obs = self._to_category_id(obs["semantic"])
+            H = sem_obs.shape[0]
+            W = sem_obs.shape[1]
+
+            #objectのcategoryリスト
+            category = []
+            for i in range(H):
+                for j in range(W):
+                    obs = sem_obs[i][j]
+                    if obs not in category:
+                        if obs not in self.black_list:
+                            category.append(obs)
+            #num_category = max(len(category), 1.0)
+            num_category = len(category)
+
+            picture_value = count_sal * num_category
+            
+            return picture_value
+            #return self._count_saliency_regions(pred_saliency)
         else:
             return -1
-        """
-
-    def _count_saliency_regions(self, saliency_map, threshold=192):
-        # 二値化
-        binary_map = (saliency_map > threshold).astype(int)
-        # 0で区切られている領域を見つける
-        labeled_map, num_regions = label(binary_map)
-        return num_regions
             
 @registry.register_measure
 class CI(Measure):

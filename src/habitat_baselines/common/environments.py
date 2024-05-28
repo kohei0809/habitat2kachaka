@@ -196,7 +196,7 @@ class InfoRLEnv(RLEnv):
 
         if self._take_picture():
             measure = self._env.get_metrics()[self._picture_measure_name]
-            saliency = measure
+            picture_value = measure
             
         # area_rewardを足す
         area_reward = current_area - self._previous_area
@@ -204,7 +204,7 @@ class InfoRLEnv(RLEnv):
         output = self._previous_area
         self._previous_area = current_area
 
-        return reward, saliency, current_area, output  
+        return reward, picture_value, current_area, output, self._take_picture()
     
     def get_polar_angle(self):
         agent_state = self._env._sim.get_agent_state()

@@ -139,7 +139,7 @@ class _Decoder(nn.Module):
         x1 = self.conv7(x1)
         x = self.sigmoid(x1)
 
-        return x
+        return x1, x
 
 
 class TransEncoder(nn.Module):
