@@ -28,6 +28,7 @@ def main():
         datadate = "23-12-26 04-22-23"
         datadate = "24-04-26 00-36-56"
         datadate = "24-05-16 16-06-47"
+        datadate = "24-06-30 03-48-07"
 
     config = get_config(exp_config)
     

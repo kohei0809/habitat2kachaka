@@ -143,7 +143,6 @@ class InfoRLEnv(RLEnv):
         self.fog_of_war_map_all = None
         observations = super().reset()
         self._previous_area = 0.0
-        self._previous_distance = self._env.get_metrics()["distance_to_multi_goal"]
         
         return observations
 
@@ -189,10 +188,9 @@ class InfoRLEnv(RLEnv):
 
         if "smooth_map_value" in info:
             smooth_current_area = info["smooth_map_value"]
-            smooth_value = smooth_current_area / 50      
+            area_reward = smooth_current_area / 50      
             output = 0.0
-            reward += smooth_value
-            #logger.info(f"smooth_current_area={smooth_current_area}, smooth_value={smooth_value}")
+            reward += area_reward
         else:
             # area_rewardの計算
             _top_down_map = info["top_down_map"]["map"]
@@ -202,16 +200,16 @@ class InfoRLEnv(RLEnv):
             current_area *= 10
             # area_rewardを足す
             area_reward = current_area - self._previous_area
-            #reward += area_reward
-            output = self._previous_area
+            reward += area_reward
+            output = 0.0
             self._previous_area = current_area
 
         measure = self._env.get_metrics()[self._picture_measure_name]
         picture_value = measure
         
-        agent_position = self._env._sim.get_agent_state().position
+        agent_position = self._env._sim.get_agent_state()["position"]
 
-        return reward, picture_value, current_area, output, self._take_picture(), self._scene_data, agent_position[0], agent_position[2]
+        return reward, picture_value, area_reward, output, self._take_picture(), None, agent_position[0], agent_position[2]
         
     def get_polar_angle(self):
         agent_state = self._env._sim.get_agent_state()

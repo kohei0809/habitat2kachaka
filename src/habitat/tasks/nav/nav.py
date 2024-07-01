@@ -1090,50 +1090,31 @@ class SmoothMapValue(Measure):
         self._coordinate_max = maps.COORDINATE_MAX
         self._top_down_map = None
         super().__init__()
-        self.log_manager = LogManager()
-        self.log_manager.setLogDirectory("./smooth_value")
-        self.log_index = 0
 
     def _get_uuid(self, *args: Any, **kwargs: Any):
         return "smooth_map_value"
 
 
-    def get_original_map(self):
-        top_down_map = maps.get_topdown_map(
+    def get_original_map(self, client):
+        top_down_map, _, _, _, _ = maps.get_topdown_map(
             self._sim,
             self._map_resolution,
-            self._num_samples,
-            False,
+            client
         )
 
         self._top_down_map = np.zeros(top_down_map.shape)
-        #logger.info(f"########## TopDown Map Shape={self._top_down_map.shape}")
 
 
-    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+    def reset_metric(self, *args: Any, **kwargs: Any):
         self._metric = None
-        self.get_original_map()
+        self.get_original_map(kwargs["client"])
             
         self.update_metric(None, None)
 
 
-    def update_metric(self, episode, action, *args: Any, **kwargs: Any):
-        agent_position = self._sim.get_agent_state().position
-        a_x, a_y = maps.to_grid(
-            agent_position[0],
-            agent_position[2],
-            self._coordinate_min,
-            self._coordinate_max,
-            self._map_resolution,
-        )
-        """
-        self.log_writer = self.log_manager.createLogWriter(f"smooth_value_{self.log_index}")
-        self.log_index += 1
-        for i in range(self._top_down_map.shape[0]):
-            for j in range(self._top_down_map.shape[1]):
-                self.log_writer.write(str(self._top_down_map[i][j]))
-            self.log_writer.writeLine()
-        """
+    def update_metric(self, action, *args: Any, **kwargs: Any):
+        agent_position = self._sim.get_agent_state()["position"]
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])
 
         self._top_down_map[a_x, a_y] += 1
 
@@ -1145,7 +1126,6 @@ class SmoothMapValue(Measure):
         # 逆数の合計を計算
         result = np.sum(inverse_squares)
         explored_size = explored_map.size
-        #logger.info(f"########## explored_size = {explored_size} ############")
         self._metric = result / explored_size
             
 

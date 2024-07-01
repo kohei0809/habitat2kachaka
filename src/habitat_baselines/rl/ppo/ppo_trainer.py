@@ -33,6 +33,7 @@ from habitat_baselines.common.utils import (
     poll_checkpoint_folder
 )
 from habitat_baselines.rl.ppo import PPOOracle, ProposedPolicyOracle
+from habitat.utils.visualizations import fog_of_war, maps
 
 import kachaka_api
 sys.path.append(f"/home/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
@@ -477,7 +478,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 300
+        checkpoint_index = 50
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
@@ -619,12 +620,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 
                 reward.append(rewards[0])
                 pic_val.append(rewards[1])
-                exp_area.append(rewards[2]-rewards[3])
+                exp_area.append(rewards[2])
                 picture_value.append(0)
                 similarity.append(0)
                 pic_sim.append(0)
                 
-                self._taken_picture_list[0].append([pic_val[0], observations[0]["rgb"], rewards[0][6], rewards[0][7]])
+                self._taken_picture_list[0].append([pic_val[0], observations["rgb"], rewards[6], rewards[7]])
                          
                 image_emd = self._create_new_image_embedding(observations["rgb"])
                 self._taken_picture_list[0].append([pic_val[0], observations["rgb"], image_emd])
@@ -653,14 +654,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     self.pre_agent_position = agent_position
                     self.pre_agent_rotation = agent_rotation
                 
-                if self.step % 50 == 0:
+                if self.step % 5 == 0:
                     # 探索済みの環境の写真を取得
-                    explored_picture, start_position = self.get_explored_picture(infos[0]["explored_map"])
+                    explored_picture, start_position = self.get_explored_picture(infos["explored_map"])
                     explored_picture = explored_to_image(explored_picture, infos[0])
                     explored_picture = Image.fromarray(np.uint8(explored_picture))
                     
                     #写真の選別
-                    self._taken_picture_list[n], picture_value[n] = self._select_pictures(self._taken_picture_list[0])
+                    self._taken_picture_list[0], picture_value[0] = self._select_pictures(self._taken_picture_list[0])
                     results_image, positions_x, positions_y = self._create_results_image(self._taken_picture_list[0], explored_picture)
                     
                     pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
@@ -683,7 +684,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     position_path = os.path.join("position.txt")
                     with open(position_path, 'a') as f:
                         for i in range(len(positions_x)):
-                            print(str(self.step) + "-" + str(i) + "," + str(positions_x[i]) + "," + str(positions_y[i]), file=f)
+                            print(str(self.step) + "-" + str(i) + "," + str(start_position) + "," + str(positions_x[i]) + "," + str(positions_y[i]), file=f)
                             
                     pbar.update()
                     episode_stats = dict()
