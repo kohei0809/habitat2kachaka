@@ -76,7 +76,7 @@ def merge_sim_episode_config(
     return sim_config
 
 
-def move(client, x, y, theta):
+def move(client, x, y, theta, _sim):
     print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
     
     while True:
@@ -87,14 +87,15 @@ def move(client, x, y, theta):
         if get_thread.is_alive():
             print("move関数は10秒以上かかりました。強制終了します。")
             client.speak("move関数は10秒以上かかりました。強制終了します。")
-            break
+            _sim.reset_position()
+            return False
         
         #client.move_to_pose(x, y, theta)
 
         result = client.get_last_command_result()[0]
         if result.success:
             #print("Success!")
-            break
+            return True
         else:
             with open(f"/home/{os.environ['USER']}/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
                 error_codes = json.load(f)
@@ -572,6 +573,7 @@ class Saliency(Measure):
         flag = (stats.mode(non_zero_pred_saliency).mode == 1)
         if flag == True:
             count_sal = raw_saliency[raw_saliency > 0].shape[0]
+            """
             sem_obs = self._to_category_id(obs["semantic"])
             H = sem_obs.shape[0]
             W = sem_obs.shape[1]
@@ -586,8 +588,10 @@ class Saliency(Measure):
                             category.append(obs)
             #num_category = max(len(category), 1.0)
             num_category = len(category)
+            """
 
-            picture_value = count_sal * num_category
+            #picture_value = count_sal * num_category
+            picture_value = count_sal
             
             return picture_value
             #return self._count_saliency_regions(pred_saliency)
@@ -1417,16 +1421,15 @@ class MoveForwardAction(Action):
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
-        theta_deg = math.degrees(theta_rad)
         
         delta_x = self._meter * math.cos(theta_rad)
         delta_y = self._meter * math.sin(theta_rad)   
         print("MOVE_FORWARD " + str(self._meter) + "[m]")
         
-        move(self._client, x+delta_x, y+delta_y, theta_rad)
-        #time.sleep(0.5)
-
-        return self._sim.get_observations_at()
+        is_success = move(self._client, x+delta_x, y+delta_y, theta_rad, self._sim)
+        if is_success == True:
+            self.pre_obs = self._sim.get_observations_at()
+        return self.pre_obs
 
     def set_client(self, client):
         self._client = client
@@ -1444,13 +1447,14 @@ class TurnLeftAction(Action):
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
-        theta_deg = math.degrees(theta_rad)
+        
         angle = math.radians(self._angle)
         print("TURN_LEFT " + str(self._angle) + "[度]")
-        move(self._client, x, y, theta_rad+angle)
-        #time.sleep(0.5)
         
-        return self._sim.get_observations_at()
+        is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        if is_success == True:
+            self.pre_obs = self._sim.get_observations_at()
+        return self.pre_obs
     
     def set_client(self, client):
         self._client = client
@@ -1469,13 +1473,13 @@ class TurnRightAction(Action):
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
-        theta_deg = math.degrees(theta_rad)
         angle = math.radians(-self._angle)
         print("TURN_RIGHT " + str(-self._angle) + "[度]")
-        move(self._client, x, y, theta_rad+angle)
-        #time.sleep(0.5)
         
-        return self._sim.get_observations_at()
+        is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        if is_success == True:
+            self.pre_obs = self._sim.get_observations_at()
+        return self.pre_obs
     
     def set_client(self, client):
         self._client = client

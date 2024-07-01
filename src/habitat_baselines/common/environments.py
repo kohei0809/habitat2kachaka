@@ -184,7 +184,7 @@ class InfoRLEnv(RLEnv):
     def get_reward(self, observations, **kwargs):
         reward = self._rl_config.SLACK_REWARD
         ci = -1000
-        saliency = -1
+        picture_value = -1
         
         # area_rewardの計算
         info = self.get_info(observations)

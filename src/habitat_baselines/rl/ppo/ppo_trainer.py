@@ -8,7 +8,7 @@ import json
 import os
 import cv2
 import sys
-from PIL import Image
+from PIL import Image, ImageDraw
 from collections import defaultdict
 from typing import Any, Dict, List
 import pyrealsense2 as rs
@@ -248,7 +248,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 res_val += sorted_picture_list[i][0]
             i += 1
 
-        res_val /= len(results)
+        result_len = max(len(results), 1)
+        res_val /= result_len
         return results, res_val
 
     def _select_random_pictures(self, taken_picture_list):
@@ -296,9 +297,9 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         draw = ImageDraw.Draw(result_image)
         for x in range(width, result_width, width):
-            draw.line([(x, 0), (x, result_height)], fill="black", width=7)
+            draw.line([(x, 0), (x, result_height)], fill="black", width=3)
         for y in range(height, result_height, height):
-            draw.line([(0, y), (result_width, y)], fill="black", width=7)
+            draw.line([(0, y), (result_width, y)], fill="black", width=3)
 
         return result_image
 
@@ -310,6 +311,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         return response
 
 
+    """
     def generate_response(self, image, input_text):
         if 'llama-2' in self.llava_model_name.lower():
             conv_mode = "llava_llama_2"
@@ -360,6 +362,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         conv.messages[-1][-1] = outputs
         outputs = outputs.replace("\n\n", " ")
         return outputs
+    """
 
     #def _exec_kachaka(self, log_manager, date, ip) -> None:
     def _exec_kachaka(self, date, ip) -> None:
@@ -415,7 +418,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 108
+        checkpoint_index = 300
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
@@ -460,16 +463,21 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self._taken_picture_list = []
             self._taken_picture_list.append([])
             
+            self.pre_agent_position = None
+            self.pre_agent_rotation = None
+            
             # LLaVA model
+            """
             load_4bit = True
             load_8bit = not load_4bit
             disable_torch_init()
             model_path = "liuhaotian/llava-v1.5-13b"
             self.llava_model_name = get_model_name_from_path(model_path)
             self.tokenizer, self.llava_model, self.llava_image_processor, _ = load_pretrained_model(model_path, None, self.llava_model_name, load_8bit, load_4bit)
-            
+            """
             # Load the clip model
             self.clip_model, self.preprocess = clip.load('ViT-B/32', self.device)
+            self._select_threthould = 0.9
         
             observations = self.env.reset()
             batch = batch_obs(observations, device=self.device)
@@ -477,8 +485,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             current_episode_reward = torch.zeros(1, 1, device=self.device)
             current_episode_exp_area = torch.zeros(1, 1, device=self.device)
             current_episode_picsim = torch.zeros(1, 1, device=self.device)
-            current_episode_sum_saliency = torch.zeros(1, 1, device=self.device)
-            
+            current_episode_picture_value = torch.zeros(1, 1, device=self.device)
             
             test_recurrent_hidden_states = torch.zeros(
                 self.actor_critic.net.num_recurrent_layers,
@@ -505,6 +512,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             self.step = 0
             while self.step < max_step:
+                skip_flag = False
                 if self.step % 10 == 0:
                     print("---------------------")
                     client.speak(str(self.step) + "ステップ終了しました。")
@@ -555,71 +563,71 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 exp_area.append(rewards[2]-rewards[3])
                 picture_value.append(0)
                 similarity.append(0)
-                pic_sim.apppend(0)
+                pic_sim.append(0)
                     
                 #TAKE_PICTUREが呼び出されたかを検証(TAKE_PICTUREを行っても変な写真の場合は保存しない)
                 if pic_val[0] == -1:
-                    continue
-                # 2回連続でTAKE_PICTUREをした場合は保存しない
-                # どうせ後から同じ写真は消すため、選別の際の計算量の削減のため
-                if pre_ac[0].item() == actions[0].item():
-                    continue
+                    skip_flag = True
+                     
+                if skip_flag == False:
+                    image_emd = self._create_new_image_embedding(observations["rgb"])
+                    self._taken_picture_list[0].append([pic_val[0], observations["rgb"], image_emd])
+                    reward[0] += self.save_picture_reward
 
-                image_emd = self._create_new_image_embedding(observations[0]["rgb"])
-                self._taken_picture_list[0].append([pic_val[0], observations[0]["rgb"], image_emd])
-                reward[0] += self.save_picture_reward
-
-                reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
-                exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
-                picture_value = torch.tensor(picture_value, dtype=torch.float, device=self.device).unsqueeze(1)
-                similarity = torch.tensor(similarity, dtype=torch.float, device=self.device).unsqueeze(1)
-                
-                current_episode_reward += reward
-                current_episode_exp_area += exp_area
+                    reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
+                    exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
+                    picture_value = torch.tensor(picture_value, dtype=torch.float, device=self.device).unsqueeze(1)
+                    similarity = torch.tensor(similarity, dtype=torch.float, device=self.device).unsqueeze(1)
+                    
+                    current_episode_reward += reward
+                    current_episode_exp_area += exp_area
                     
                 # episode continues
                 if len(self.config.VIDEO_OPTION) > 0:
-                    frame = observations_to_image(observations, infos, action.cpu().numpy())
-                    for _ in range(10):
+                    agent_position = infos["top_down_map"]["agent_map_coord"]
+                    agent_rotation=infos["top_down_map"]["agent_angle"],
+                    
+                    if (agent_position == self.pre_agent_position) and (agent_rotation == self.pre_agent_rotation):
+                        frame = rgb_frames[0][-1] 
+                    else:
+                        frame = observations_to_image(observations, infos, action.cpu().numpy())
+                    for _ in range(5):
                         rgb_frames[0].append(frame)
+                        
+                    self.pre_agent_position = agent_position
+                    self.pre_agent_rotation = agent_rotation
                 
                 if self.step % 50 == 0:
                     #写真の選別
                     self._taken_picture_list[0], picture_value[0] = self._select_pictures(self._taken_picture_list[0])
                     results_image = self._create_results_image(self._taken_picture_list[0])
-                    pred_description = self.create_description(self._taken_picture_list[0])
                     
-                    pic_sim[n] = self._calculate_pic_sim(self._taken_picture_list[n])
-                    reward[n] += similarity[n]*10
-                    current_episode_reward += similarity[n]*10
-                    
+                    pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
+                    reward[0] += similarity[0]*10
+ 
                     # average of picture value par 1 picture
-                    current_episode_picture_value[n] += picture_value[n]
-                    current_episode_picsim[n] += pic_sim[n]
+                    current_episode_picture_value[0] += picture_value[0]
+                    current_episode_picsim[0] += pic_sim[0]
                             
                     # save description
+                    """
                     out_path = os.path.join("output_descriptions/description.txt")
                     with open(out_path, 'a') as f:
                         # print関数でファイルに出力する
                         print(self.step,file=f)
                         print(pred_description,file=f)
+                    """
                             
                     pbar.update()
                     episode_stats = dict()
-                    episode_stats["reward"] = current_episode_reward[n].item()
-                    episode_stats["exp_area"] = current_episode_exp_area[n].item()
-                    episode_stats["picture_value"] = current_episode_picture_value[n].item()
-                    episode_stats["pic_sim"] = current_episode_picsim[n].item()
+                    episode_stats["reward"] = current_episode_reward[0].item()
+                    episode_stats["exp_area"] = current_episode_exp_area[0].item()
+                    episode_stats["picture_value"] = current_episode_picture_value[0].item()
+                    episode_stats["pic_sim"] = current_episode_picsim[0].item()
                                 
                     episode_stats.update(
                         self._extract_scalars_from_info(infos)
                     )
-                    
-                    current_episode_reward[n] = 0
-                    current_episode_exp_area[n] = 0
-                    current_episode_picture_value[n] = 0
-                    current_episode_similarity[n] = 0
-                    current_episode_picsim[n] = 0
                     
                     # use scene_id + episode_id as unique id for storing stats
                     stats_episodes[
@@ -640,7 +648,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         for j in range(10):
                             rgb_frames[0].append(picture) 
                         metrics=self._extract_scalars_from_info(infos)    
-                        name_sim = similarity[0].item()
+                        name_sim = -1
                         
                         generate_video(
                             video_option=self.config.VIDEO_OPTION,
@@ -655,7 +663,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         
                         # Save taken picture                     
                         for j in range(len(self._taken_picture_list[0])):
-                            value = self._taken_picture_list[n][j][0]
+                            value = self._taken_picture_list[0][j][0]
                             picture_name = f"episode=aaa-{len(stats_episodes)}-{j}-{self.step}-{value}"
                             dir_name = "./taken_picture/" + date 
                             os.makedirs(dir_name, exist_ok=True)
@@ -665,7 +673,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             picture.save(file_path)
                             
                         if results_image is not None:
-                            results_image.save(f"/gs/fs/tga-aklab/matsumoto/Main/taken_picture/{date}/episoede={_episode_id}-{len(stats_episodes)}.png")    
+                            results_image.save(f"./taken_picture/{date}/episoede=aaa-{self.step}.png")    
             
             client.speak("エピソードが終了しました。")
                     

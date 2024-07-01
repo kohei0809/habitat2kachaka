@@ -27,6 +27,7 @@ def main():
         datadate = "23-10-26 18-29-56"
         datadate = "23-12-26 04-22-23"
         datadate = "24-04-26 00-36-56"
+        datadate = "24-05-16 16-06-47"
 
     config = get_config(exp_config)
     
@@ -76,7 +77,7 @@ def main():
     print("-----------------------------------")
 
     
-    ip = "192.168.100.15:26400"
+    ip = "192.168.100.47:26400"
     trainer._exec_kachaka(start_date, ip)
     #trainer._exec_kachaka(log_manager, start_date, ip)
        

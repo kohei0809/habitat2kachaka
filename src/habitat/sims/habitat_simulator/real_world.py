@@ -225,6 +225,12 @@ class RealWorld(Simulator):
             sim_sensors.append(RealDepthSensor(config=self.config.DEPTH_SENSOR))
 
         self._sensor_suite = SensorSuite(sim_sensors)
+        
+        self.is_reset_postion = False
+        self.x = None
+        self.y = None
+        self.z = None
+        self.theta_rad = None
 
     @property
     def sensor_suite(self) -> SensorSuite:
@@ -262,13 +268,15 @@ class RealWorld(Simulator):
         return distance
 
     def get_agent_state(self):
-        pos = self._client.get_robot_pose()
-        x = pos.x
-        y = pos.y
-        z = 0.0
-        theta_rad = pos.theta + math.pi/2
+        if self.is_reset_postion == False:
+            pos = self._client.get_robot_pose()
+            self.x = pos.x
+            self.y = pos.y
+            self.z = 0.0
+            self.theta_rad = pos.theta + math.pi/2
         
-        return {"position":[x, z, y], "rotation": theta_rad}
+        self.is_reset_postion = True
+        return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
 
     def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
         if agent_id is None:
@@ -281,3 +289,6 @@ class RealWorld(Simulator):
     def get_observations_at(self) -> Optional[Observations]:
         observations = self._sensor_suite.get_observations()
         return observations
+    
+    def reset_position(self) -> None:
+        self.is_reset_postion = True
