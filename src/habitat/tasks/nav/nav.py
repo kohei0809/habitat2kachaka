@@ -1076,6 +1076,180 @@ class TopDownMap(Measure):
             
             
 @registry.register_measure
+class ExploredMap(Measure):
+    r"""Explored Map measure"""
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+        self._grid_delta = config.MAP_PADDING
+        self._step_count = None
+        self._map_resolution = (config.MAP_RESOLUTION, config.MAP_RESOLUTION)
+        self._num_samples = config.NUM_TOPDOWN_MAP_SAMPLE_POINTS
+        self._ind_x_min = None
+        self._ind_x_max = None
+        self._ind_y_min = None
+        self._ind_y_max = None
+        self._previous_xy_location = None
+        self._coordinate_min = maps.COORDINATE_MIN
+        self._coordinate_max = maps.COORDINATE_MAX
+        self._top_down_map = None
+        self.point_padding = 2 * int(
+            np.ceil(self._map_resolution[0] / MAP_THICKNESS_SCALAR)
+        )
+        super().__init__()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "explored_map"
+
+
+    def get_original_map(self):
+        top_down_map = maps.get_topdown_map(
+            self._sim,
+            self._map_resolution,
+            self._num_samples,
+            self._config.DRAW_BORDER,
+        )
+
+        range_x = np.where(np.any(top_down_map, axis=1))[0]
+        range_y = np.where(np.any(top_down_map, axis=0))[0]
+
+        self._ind_x_min = range_x[0]
+        self._ind_x_max = range_x[-1]
+        self._ind_y_min = range_y[0]
+        self._ind_y_max = range_y[-1]
+
+        if self._config.FOG_OF_WAR.DRAW:
+            self._fog_of_war_mask = np.zeros_like(top_down_map)
+
+        return top_down_map
+
+    def _draw_point(self, position, point_type):
+        t_x, t_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
+        self._top_down_map[
+            t_x - self.point_padding : t_x + self.point_padding + 1,
+            t_y - self.point_padding : t_y + self.point_padding + 1,
+        ] = point_type
+
+        if self._ind_x_min > t_x - self.point_padding:
+           self._ind_x_min = t_x - self.point_padding 
+        if self._ind_x_max < t_x + self.point_padding:
+           self._ind_x_max = t_x + self.point_padding 
+        if self._ind_y_min > t_y - self.point_padding:
+           self._ind_y_min = t_y - self.point_padding 
+        if self._ind_y_max > t_y + self.point_padding:
+           self._ind_y_max = t_y + self.point_padding 
+
+
+    def _draw_goals_positions(self, position):
+        try:
+            self._draw_point(
+                position, maps.MAP_TARGET_POINT_INDICATOR
+            )
+        except AttributeError:
+            pass
+
+
+    def reset_metric(self, *args: Any, **kwargs: Any):
+        self._step_count = 0
+        self._metric = None
+        self._top_down_map = self.get_original_map()
+        agent_position = self._sim.get_agent_state()["position"]
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
+
+        self.start_position_x = agent_position[0]
+        self.start_position_y = agent_position[2]
+        self.start_grid_x = a_x
+        self.start_grid_y = a_y
+
+        for i in range(-2,3):
+            for j in range(-2,3):
+                self._top_down_map
+
+        self._previous_xy_location = (a_y, a_x)
+
+        self.update_fog_of_war_mask(np.array([a_x, a_y]))
+
+        # draw source and target parts last to avoid overlap
+        self._draw_goals_positions((episode.start_position[0]+1.0, episode.start_position[1], episode.start_position[2]+1.0))
+
+        if self._config.DRAW_SOURCE:
+            self._draw_point(
+                episode.start_position, maps.MAP_SOURCE_POINT_INDICATOR
+            )
+            
+        self.update_metric(None, None)
+
+    def _clip_map(self, _map):
+        return _map[
+            self._ind_x_min
+            - self._grid_delta : self._ind_x_max
+            + self._grid_delta,
+            self._ind_y_min
+            - self._grid_delta : self._ind_y_max
+            + self._grid_delta,
+        ]
+
+    def update_metric(self, action, *args: Any, **kwargs: Any):
+        self._step_count += 1
+        house_map, map_agent_x, map_agent_y = self.update_map(
+            self._sim.get_agent_state()["position"]
+        )
+
+        # Rather than return the whole map which may have large empty regions,
+        # only return the occupied part (plus some padding).
+        #clipped_house_map = self._clip_map(house_map)
+        clipped_house_map = house_map
+
+        clipped_fog_of_war_map = None
+        if self._config.FOG_OF_WAR.DRAW:
+            #clipped_fog_of_war_map = self._clip_map(self._fog_of_war_mask)
+            clipped_fog_of_war_map= self._fog_of_war_mask
+
+        self._metric = {
+            "map": clipped_house_map,
+            "fog_of_war_mask": clipped_fog_of_war_map,
+            "start_position": (self.start_position_x, self.start_position_y),
+        }
+
+    def get_polar_angle(self):
+        agent_state = self._sim.get_agent_state()
+        # quaternion is in x, y, z, w format
+        ref_rotation = agent_state.rotation
+
+        heading_vector = quaternion_rotate_vector(
+            ref_rotation.inverse(), np.array([0, 0, -1])
+        )
+
+        phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
+        x_y_flip = -np.pi / 2
+        return np.array(phi) + x_y_flip
+
+    def update_map(self, agent_position):
+        a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
+
+        self.update_fog_of_war_mask(np.array([a_x, a_y]))
+
+        self._previous_xy_location = (a_y, a_x)
+        return self._top_down_map, a_x, a_y
+
+    def update_fog_of_war_mask(self, agent_position):
+        if self._config.FOG_OF_WAR.DRAW:
+            self._fog_of_war_mask = fog_of_war.reveal_fog_of_war(
+                self._top_down_map,
+                self._fog_of_war_mask,
+                agent_position,
+                self.get_polar_angle(),
+                fov=self._config.FOG_OF_WAR.FOV,
+                max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
+                * max(self._map_resolution)
+                / (self._coordinate_max - self._coordinate_min),
+            )
+            
+            
+@registry.register_measure
 class SmoothMapValue(Measure):
     r"""Smooth Map Value measure"""
 
