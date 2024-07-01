@@ -657,7 +657,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 if self.step % 5 == 0:
                     # 探索済みの環境の写真を取得
                     explored_picture, start_position = self.get_explored_picture(infos["explored_map"])
-                    explored_picture = explored_to_image(explored_picture, infos[0])
+                    explored_picture = explored_to_image(explored_picture, infos)
                     explored_picture = Image.fromarray(np.uint8(explored_picture))
                     
                     #写真の選別

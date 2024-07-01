@@ -1105,12 +1105,11 @@ class ExploredMap(Measure):
         return "explored_map"
 
 
-    def get_original_map(self):
-        top_down_map = maps.get_topdown_map(
+    def get_original_map(self, client=None):
+        top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
             self._map_resolution,
-            self._num_samples,
-            self._config.DRAW_BORDER,
+            client,        
         )
 
         range_x = np.where(np.any(top_down_map, axis=1))[0]
@@ -1127,7 +1126,7 @@ class ExploredMap(Measure):
         return top_down_map
 
     def _draw_point(self, position, point_type):
-        t_x, t_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
+        t_x, t_y = maps.to_grid(self.client, position[0], position[2])    
         self._top_down_map[
             t_x - self.point_padding : t_x + self.point_padding + 1,
             t_y - self.point_padding : t_y + self.point_padding + 1,
@@ -1155,11 +1154,12 @@ class ExploredMap(Measure):
     def reset_metric(self, *args: Any, **kwargs: Any):
         self._step_count = 0
         self._metric = None
-        self._top_down_map = self.get_original_map()
+        self._top_down_map = self.get_original_map(kwargs["client"])
         agent_position = self._sim.get_agent_state()["position"]
         a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
 
         self.start_position_x = agent_position[0]
+        self.start_position_z = agent_position[1]
         self.start_position_y = agent_position[2]
         self.start_grid_x = a_x
         self.start_grid_y = a_y
@@ -1173,11 +1173,11 @@ class ExploredMap(Measure):
         self.update_fog_of_war_mask(np.array([a_x, a_y]))
 
         # draw source and target parts last to avoid overlap
-        self._draw_goals_positions((episode.start_position[0]+1.0, episode.start_position[1], episode.start_position[2]+1.0))
+        self._draw_goals_positions((self.start_position_x+1.0, self.start_position_z, self.start_position_y+1.0))
 
         if self._config.DRAW_SOURCE:
             self._draw_point(
-                episode.start_position, maps.MAP_SOURCE_POINT_INDICATOR
+                (self.start_position_x, self.start_position_z, self.start_position_y), maps.MAP_SOURCE_POINT_INDICATOR
             )
             
         self.update_metric(None, None)
@@ -1217,7 +1217,7 @@ class ExploredMap(Measure):
     def get_polar_angle(self):
         agent_state = self._sim.get_agent_state()
         # quaternion is in x, y, z, w format
-        ref_rotation = agent_state.rotation
+        ref_rotation = agent_state["rotation"]
 
         heading_vector = quaternion_rotate_vector(
             ref_rotation.inverse(), np.array([0, 0, -1])
@@ -1241,7 +1241,7 @@ class ExploredMap(Measure):
                 self._top_down_map,
                 self._fog_of_war_mask,
                 agent_position,
-                self.get_polar_angle(),
+                -self._sim.get_agent_state()["rotation"]+math.pi/2,
                 fov=self._config.FOG_OF_WAR.FOV,
                 max_line_len=self._config.FOG_OF_WAR.VISIBILITY_DIST
                 * max(self._map_resolution)
