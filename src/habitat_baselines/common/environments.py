@@ -185,27 +185,34 @@ class InfoRLEnv(RLEnv):
         reward = self._rl_config.SLACK_REWARD
         ci = -1000
         picture_value = -1
-        
-        # area_rewardの計算
         info = self.get_info(observations)
-        _top_down_map = info["top_down_map"]["map"]
-        _fog_of_war_map = info["top_down_map"]["fog_of_war_mask"]
+
+        if "smooth_map_value" in info:
+            smooth_current_area = info["smooth_map_value"]
+            smooth_value = smooth_current_area / 50      
+            output = 0.0
+            reward += smooth_value
+            #logger.info(f"smooth_current_area={smooth_current_area}, smooth_value={smooth_value}")
+        else:
+            # area_rewardの計算
+            _top_down_map = info["top_down_map"]["map"]
+            _fog_of_war_map = info["top_down_map"]["fog_of_war_mask"]
+
+            current_area = self._cal_explored_rate(_top_down_map, _fog_of_war_map)
+            current_area *= 10
+            # area_rewardを足す
+            area_reward = current_area - self._previous_area
+            #reward += area_reward
+            output = self._previous_area
+            self._previous_area = current_area
+
+        measure = self._env.get_metrics()[self._picture_measure_name]
+        picture_value = measure
         
-        current_area = self._cal_explored_rate(_top_down_map, _fog_of_war_map)
-        current_area *= 10
+        agent_position = self._env._sim.get_agent_state().position
 
-        if self._take_picture():
-            measure = self._env.get_metrics()[self._picture_measure_name]
-            picture_value = measure
-            
-        # area_rewardを足す
-        area_reward = current_area - self._previous_area
-        reward += area_reward
-        output = self._previous_area
-        self._previous_area = current_area
-
-        return reward, picture_value, current_area, output, self._take_picture()
-    
+        return reward, picture_value, current_area, output, self._take_picture(), self._scene_data, agent_position[0], agent_position[2]
+        
     def get_polar_angle(self):
         agent_state = self._env._sim.get_agent_state()
         # quaternion is in x, y, z, w format

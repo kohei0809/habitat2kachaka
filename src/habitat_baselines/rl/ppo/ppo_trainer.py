@@ -21,7 +21,7 @@ import tqdm
 
 from habitat import Config
 from habitat.core.logging import logger
-from habitat.utils.visualizations.utils import observations_to_image
+from habitat.utils.visualizations.utils import observations_to_image, explored_to_image
 from habitat_baselines.common.base_trainer import BaseRLTrainerOracle
 from habitat_baselines.common.baseline_registry import baseline_registry
 from habitat_baselines.common.env_utils import construct_env
@@ -276,14 +276,19 @@ class PPOTrainerO(BaseRLTrainerOracle):
         return True
 
 
-    def _create_results_image(self, picture_list):
+    def _create_results_image(self, picture_list, explored_picture):
         images = []
+        x_list = []
+        y_list = []
+    
         if len(picture_list) == 0:
             return None
 
         for i in range(self._num_picture):
             idx = i%len(picture_list)
             images.append(Image.fromarray(picture_list[idx][1]))
+            x_list.append(picture_list[idx][2])
+            y_list.append(picture_list[idx][3])
 
         width, height = images[0].size
         result_width = width * 5
@@ -297,11 +302,33 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         draw = ImageDraw.Draw(result_image)
         for x in range(width, result_width, width):
-            draw.line([(x, 0), (x, result_height)], fill="black", width=3)
+            draw.line([(x, 0), (x, result_height)], fill="black", width=7)
         for y in range(height, result_height, height):
-            draw.line([(0, y), (result_width, y)], fill="black", width=3)
+            draw.line([(0, y), (result_width, y)], fill="black", width=7)
 
-        return result_image
+        # explored_pictureの新しい横幅を計算
+        if explored_picture.height != 0:
+            aspect_ratio = explored_picture.width / explored_picture.height
+        else:
+            aspect_ratio = explored_picture.width
+        new_explored_picture_width = int(result_height * aspect_ratio)
+
+        # explored_pictureをリサイズ
+        explored_picture = explored_picture.resize((new_explored_picture_width, result_height))
+
+        # 最終画像の幅を計算
+        final_width = result_width + new_explored_picture_width
+
+        # 最終画像を作成
+        final_image = Image.new('RGB', (final_width, result_height), color=(255, 255, 255))
+
+        # result_imageを貼り付け
+        final_image.paste(result_image, (0, 0))
+
+        # リサイズしたexplored_pictureを貼り付け
+        final_image.paste(explored_picture, (result_width, 0))
+
+        return final_image, x_list, y_list
 
 
     def create_description_from_results_image(self, results_image):
@@ -363,8 +390,40 @@ class PPOTrainerO(BaseRLTrainerOracle):
         outputs = outputs.replace("\n\n", " ")
         return outputs
     """
+    
+    
+    def get_explored_picture(self, infos):
+        explored_map = infos["map"]
+        fog_of_war_map = infos["fog_of_war_mask"]
+        start_position = infos["start_position"]
+        y, x = explored_map.shape
 
-    #def _exec_kachaka(self, log_manager, date, ip) -> None:
+        for i in range(y):
+            for j in range(x):
+                if fog_of_war_map[i][j] == 1:
+                    if explored_map[i][j] == maps.MAP_VALID_POINT:
+                        explored_map[i][j] = maps.MAP_INVALID_POINT
+                else:
+                    if explored_map[i][j] in [maps.MAP_VALID_POINT, maps.MAP_INVALID_POINT]:
+                        explored_map[i][j] = maps.MAP_BORDER_INDICATOR
+
+        range_x = np.where(~np.all(explored_map == maps.MAP_BORDER_INDICATOR, axis=1))[0]
+        range_y = np.where(~np.all(explored_map == maps.MAP_BORDER_INDICATOR, axis=0))[0]
+
+        _ind_x_min = range_x[0]
+        _ind_x_max = range_x[-1]
+        _ind_y_min = range_y[0]
+        _ind_y_max = range_y[-1]
+        _grid_delta = 3
+
+        explored_map = explored_map[
+            _ind_x_min - _grid_delta : _ind_x_max + _grid_delta,
+            _ind_y_min - _grid_delta : _ind_y_max + _grid_delta,
+        ]
+            
+        return explored_map, start_position
+
+
     def _exec_kachaka(self, date, ip) -> None:
         max_step = 500
         #self.cap = cv2.VideoCapture(0)
@@ -564,23 +623,20 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 picture_value.append(0)
                 similarity.append(0)
                 pic_sim.append(0)
-                    
-                #TAKE_PICTUREが呼び出されたかを検証(TAKE_PICTUREを行っても変な写真の場合は保存しない)
-                if pic_val[0] == -1:
-                    skip_flag = True
-                     
-                if skip_flag == False:
-                    image_emd = self._create_new_image_embedding(observations["rgb"])
-                    self._taken_picture_list[0].append([pic_val[0], observations["rgb"], image_emd])
-                    reward[0] += self.save_picture_reward
+                
+                self._taken_picture_list[0].append([pic_val[0], observations[0]["rgb"], rewards[0][6], rewards[0][7]])
+                         
+                image_emd = self._create_new_image_embedding(observations["rgb"])
+                self._taken_picture_list[0].append([pic_val[0], observations["rgb"], image_emd])
+                reward[0] += self.save_picture_reward
 
-                    reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
-                    exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
-                    picture_value = torch.tensor(picture_value, dtype=torch.float, device=self.device).unsqueeze(1)
-                    similarity = torch.tensor(similarity, dtype=torch.float, device=self.device).unsqueeze(1)
+                reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
+                exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
+                picture_value = torch.tensor(picture_value, dtype=torch.float, device=self.device).unsqueeze(1)
+                similarity = torch.tensor(similarity, dtype=torch.float, device=self.device).unsqueeze(1)
                     
-                    current_episode_reward += reward
-                    current_episode_exp_area += exp_area
+                current_episode_reward += reward
+                current_episode_exp_area += exp_area
                     
                 # episode continues
                 if len(self.config.VIDEO_OPTION) > 0:
@@ -598,9 +654,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     self.pre_agent_rotation = agent_rotation
                 
                 if self.step % 50 == 0:
+                    # 探索済みの環境の写真を取得
+                    explored_picture, start_position = self.get_explored_picture(infos[0]["explored_map"])
+                    explored_picture = explored_to_image(explored_picture, infos[0])
+                    explored_picture = Image.fromarray(np.uint8(explored_picture))
+                    
                     #写真の選別
-                    self._taken_picture_list[0], picture_value[0] = self._select_pictures(self._taken_picture_list[0])
-                    results_image = self._create_results_image(self._taken_picture_list[0])
+                    self._taken_picture_list[n], picture_value[n] = self._select_pictures(self._taken_picture_list[0])
+                    results_image, positions_x, positions_y = self._create_results_image(self._taken_picture_list[0], explored_picture)
                     
                     pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
                     reward[0] += similarity[0]*10
@@ -617,6 +678,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         print(self.step,file=f)
                         print(pred_description,file=f)
                     """
+                    
+                    # save picture position
+                    position_path = os.path.join("position.txt")
+                    with open(position_path, 'a') as f:
+                        for i in range(len(positions_x)):
+                            print(str(self.step) + "-" + str(i) + "," + str(positions_x[i]) + "," + str(positions_y[i]), file=f)
                             
                     pbar.update()
                     episode_stats = dict()

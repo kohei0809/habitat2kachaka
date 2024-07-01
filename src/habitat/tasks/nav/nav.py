@@ -506,8 +506,8 @@ class Picture(Measure):
         ):
             self._metric = 1
         else:
-            self._metric = 0
-            #self._metric = 1
+            #self._metric = 0
+            self._metric = 1
             
 @registry.register_measure
 class Saliency(Measure):
@@ -1073,6 +1073,80 @@ class TopDownMap(Measure):
                 * max(self._map_resolution)
                 / (self._coordinate_max - self._coordinate_min),
             )
+            
+            
+@registry.register_measure
+class SmoothMapValue(Measure):
+    r"""Smooth Map Value measure"""
+
+    def __init__(
+        self, *args: Any, sim: Simulator, config: Config, **kwargs: Any
+    ):
+        self._sim = sim
+        self._config = config
+        self._map_resolution = (config.MAP_RESOLUTION, config.MAP_RESOLUTION)
+        self._num_samples = config.NUM_TOPDOWN_MAP_SAMPLE_POINTS
+        self._coordinate_min = maps.COORDINATE_MIN
+        self._coordinate_max = maps.COORDINATE_MAX
+        self._top_down_map = None
+        super().__init__()
+        self.log_manager = LogManager()
+        self.log_manager.setLogDirectory("./smooth_value")
+        self.log_index = 0
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "smooth_map_value"
+
+
+    def get_original_map(self):
+        top_down_map = maps.get_topdown_map(
+            self._sim,
+            self._map_resolution,
+            self._num_samples,
+            False,
+        )
+
+        self._top_down_map = np.zeros(top_down_map.shape)
+        #logger.info(f"########## TopDown Map Shape={self._top_down_map.shape}")
+
+
+    def reset_metric(self, *args: Any, episode, **kwargs: Any):
+        self._metric = None
+        self.get_original_map()
+            
+        self.update_metric(None, None)
+
+
+    def update_metric(self, episode, action, *args: Any, **kwargs: Any):
+        agent_position = self._sim.get_agent_state().position
+        a_x, a_y = maps.to_grid(
+            agent_position[0],
+            agent_position[2],
+            self._coordinate_min,
+            self._coordinate_max,
+            self._map_resolution,
+        )
+        """
+        self.log_writer = self.log_manager.createLogWriter(f"smooth_value_{self.log_index}")
+        self.log_index += 1
+        for i in range(self._top_down_map.shape[0]):
+            for j in range(self._top_down_map.shape[1]):
+                self.log_writer.write(str(self._top_down_map[i][j]))
+            self.log_writer.writeLine()
+        """
+
+        self._top_down_map[a_x, a_y] += 1
+
+        explored_map = self._top_down_map[self._top_down_map != 0]
+        
+        # 各要素の平方の逆数を計算
+        inverse_squares = 1 / np.square(explored_map)
+    
+        # 逆数の合計を計算
+        result = np.sum(inverse_squares)
+        explored_size = explored_map.size
+        #logger.info(f"########## explored_size = {explored_size} ############")
+        self._metric = result / explored_size
             
 
 @registry.register_measure

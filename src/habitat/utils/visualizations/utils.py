@@ -231,9 +231,6 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
     if "collisions" in info and info["collisions"]["is_collision"]:
         egocentric_view = draw_collision(egocentric_view)
 
-    if action[0] == 0:
-        egocentric_view = draw_found(egocentric_view)
-
     frame = egocentric_view
 
     if "top_down_map" in info:
@@ -268,6 +265,17 @@ def observations_to_image(observation: Dict, info: Dict, action: np.ndarray, max
         )
         frame = np.concatenate((egocentric_view, top_down_map), axis=1)
     return frame
+
+
+def explored_to_image(explored_map, info: Dict) -> np.ndarray:
+    explored_map = maps.colorize_explored_map(
+        explored_map, info["explored_map"]["fog_of_war_mask"]
+    )
+        
+    if explored_map.shape[0] > explored_map.shape[1]:
+        explored_map = np.rot90(explored_map, 1)
+
+    return explored_map
 
 
 def append_text_to_image(image: np.ndarray, text: str):
