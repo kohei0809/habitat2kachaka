@@ -275,7 +275,6 @@ class RealWorld(Simulator):
             self.z = 0.0
             self.theta_rad = pos.theta + math.pi/2
         
-        self.is_reset_postion = True
         return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
 
     def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
@@ -292,3 +291,8 @@ class RealWorld(Simulator):
     
     def reset_position(self) -> None:
         self.is_reset_postion = True
+        #print("####### 自己位置をリセットしました ##########")
+        
+    def unreset_position(self) -> None:
+        self.is_reset_postion = False
+        #print("####### 自己位置を動かします ##########")

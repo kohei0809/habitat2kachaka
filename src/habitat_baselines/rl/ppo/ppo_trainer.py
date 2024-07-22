@@ -217,13 +217,14 @@ class PPOTrainerO(BaseRLTrainerOracle):
         sim_list = [[-10 for _ in range(len(picture_list))] for _ in range(len(picture_list))]
 
         for i in range(len(picture_list)):
-            emd = picture_list[i][2]
+            emd = self._create_new_image_embedding(picture_list[i][1])
             for j in range(i, len(picture_list)):
                 if i == j:
                     sim_list[i][j] = 0.0
                     continue
                     
-                sim_list[i][j] = util.pytorch_cos_sim(emd, picture_list[j][2]).item()
+                emd2 = self._create_new_image_embedding(picture_list[j][1])
+                sim_list[i][j] = util.pytorch_cos_sim(emd, emd2).item()
                 sim_list[j][i] = sim_list[i][j]
                 
         total_sim = np.sum(sim_list)
@@ -241,7 +242,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 break
             if i == len(sorted_picture_list):
                 break
-            emd = sorted_picture_list[i][2]
+            emd = self._create_new_image_embedding(sorted_picture_list[i][1])
             is_save = self._decide_save(emd, results)
 
             if is_save == True:
@@ -269,7 +270,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
     def _decide_save(self, emd, results):
         for i in range(len(results)):
-            check_emb = results[i][2]
+            check_emb = self._create_new_image_embedding(results[i][1])
 
             sim = util.pytorch_cos_sim(emd, check_emb).item()
             if sim >= self._select_threthould:
@@ -393,11 +394,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
     """
     
     
-    def get_explored_picture(self, infos):
-        explored_map = infos["map"]
-        fog_of_war_map = infos["fog_of_war_mask"]
-        start_position = infos["start_position"]
+    def get_explored_picture(self, explored, top_down_map):
+        explored_map = explored["map"]
+        fog_of_war_map = top_down_map["fog_not_clip"]
+        start_position = explored["start_position"]
         y, x = explored_map.shape
+        print(f"EXPLORED={explored_map.shape}, FOG={fog_of_war_map.shape}")
 
         for i in range(y):
             for j in range(x):
@@ -540,6 +542,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             self._select_threthould = 0.9
         
             observations = self.env.reset()
+            self.pre_observations = observations
             batch = batch_obs(observations, device=self.device)
 
             current_episode_reward = torch.zeros(1, 1, device=self.device)
@@ -593,16 +596,17 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         not_done_masks,
                         deterministic=False,
                     )
-                    
-                    pre_ac = torch.zeros(prev_actions.shape[0], 1, device=self.device, dtype=torch.long)
-                    for i in range(prev_actions.shape[0]):
-                        pre_ac[i] = prev_actions[i]
 
                     prev_actions.copy_(action)
 
                 outputs = self.env.step(action[0].item())
     
                 observations, rewards, done, infos = outputs
+                observations, is_success = observations
+                if is_success == False:
+                    observations = self.pre_observations
+                else:
+                    self.pre_observations = observations
                 batch = batch_obs(observations, device=self.device)
                 
                 not_done_masks = torch.tensor(
@@ -626,10 +630,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 pic_sim.append(0)
                 
                 self._taken_picture_list[0].append([pic_val[0], observations["rgb"], rewards[6], rewards[7]])
-                         
-                image_emd = self._create_new_image_embedding(observations["rgb"])
-                self._taken_picture_list[0].append([pic_val[0], observations["rgb"], image_emd])
-                reward[0] += self.save_picture_reward
 
                 reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
                 exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
@@ -644,19 +644,16 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     agent_position = infos["top_down_map"]["agent_map_coord"]
                     agent_rotation=infos["top_down_map"]["agent_angle"],
                     
-                    if (agent_position == self.pre_agent_position) and (agent_rotation == self.pre_agent_rotation):
+                    if is_success == False:
                         frame = rgb_frames[0][-1] 
                     else:
                         frame = observations_to_image(observations, infos, action.cpu().numpy())
                     for _ in range(5):
                         rgb_frames[0].append(frame)
-                        
-                    self.pre_agent_position = agent_position
-                    self.pre_agent_rotation = agent_rotation
                 
-                if self.step % 5 == 0:
+                if self.step % 50 == 0:
                     # 探索済みの環境の写真を取得
-                    explored_picture, start_position = self.get_explored_picture(infos["explored_map"])
+                    explored_picture, start_position = self.get_explored_picture(infos["explored_map"], infos["top_down_map"])
                     explored_picture = explored_to_image(explored_picture, infos)
                     explored_picture = Image.fromarray(np.uint8(explored_picture))
                     

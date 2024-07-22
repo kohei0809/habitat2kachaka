@@ -308,7 +308,7 @@ class EmbodiedTask:
         ), f"Can't find '{action_name}' action in {self.actions.keys()}."
 
         task_action = self.actions[action_name]
-        observations = task_action.step(
+        observations, is_success = task_action.step(
             self, **action["action_args"], task=self
         )
         
@@ -324,7 +324,7 @@ class EmbodiedTask:
             observations=observations, action=action
         )
 
-        return observations
+        return observations, is_success
 
     def get_action_name(self, action_index: int):
         if action_index >= len(self.actions):

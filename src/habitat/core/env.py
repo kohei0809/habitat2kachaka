@@ -334,7 +334,7 @@ class Env:
         if isinstance(action, str) or isinstance(action, (int, np.integer)):
             action = {"action": action}
 
-        observations = self.task.step(action=action)
+        observations, is_success = self.task.step(action=action)
 
         self._task.measurements.update_measures(
            action=action, task=self.task
@@ -379,7 +379,7 @@ class Env:
                 log_writer.writeLine()     
 
         self._update_step_stats()
-        return observations
+        return observations, is_success
 
     def seed(self, seed: int) -> None:
         self._sim.seed(seed)
@@ -483,12 +483,12 @@ class RLEnv(gym.Env):
         :return: :py:`(observations, reward, done, info)`
         """
 
-        observations = self._env.step(*args, **kwargs)
+        observations, is_success = self._env.step(*args, **kwargs)
         reward = self.get_reward(observations, **kwargs)
         done = self.get_done(observations)
         info = self.get_info(observations)
 
-        return observations, reward, done, info
+        return [observations, is_success], reward, done, info
 
     def seed(self, seed: Optional[int] = None) -> None:
         self._env.seed(seed)

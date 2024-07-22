@@ -91,7 +91,7 @@ def move(client, x, y, theta, _sim):
             return False
         
         #client.move_to_pose(x, y, theta)
-
+        _sim.unreset_position()
         result = client.get_last_command_result()[0]
         if result.success:
             #print("Success!")
@@ -892,78 +892,6 @@ class TopDownMap(Measure):
             self._ind_x_min - self._grid_delta : self._ind_x_max + self._grid_delta,
         ]
 
-    def _draw_point(self, position, point_type):
-        t_x, t_y = maps.to_grid(self.client, position[0], position[2])
-        self._top_down_map[
-            t_x - self.point_padding : t_x + self.point_padding + 1,
-            t_y - self.point_padding : t_y + self.point_padding + 1,
-        ] = point_type
-
-    def _draw_goals_view_points(self, episode):
-        if self._config.DRAW_VIEW_POINTS:
-            for goal in episode.goals:
-                try:
-                    if goal.view_points is not None:
-                        for view_point in goal.view_points:
-                            self._draw_point(
-                                view_point.agent_state.position,
-                                maps.MAP_VIEW_POINT_INDICATOR,
-                            )
-                except AttributeError:
-                    pass
-
-    def _draw_goals_positions(self, episode):
-        if self._config.DRAW_GOAL_POSITIONS:
-            for i, goal in enumerate(episode.goals):
-                try:
-                    self._draw_point(
-                        goal.position, maps.MAP_TARGET_POINT_INDICATOR+i
-                    )
-                except AttributeError:
-                    pass
-
-    def _draw_goals_aabb(self, episode):
-        if self._config.DRAW_GOAL_AABBS:
-            for goal in episode.goals:
-                try:
-                    sem_scene = self._sim.semantic_annotations()
-                    object_id = goal.object_id
-                    assert int(
-                        sem_scene.objects[object_id].id.split("_")[-1]
-                    ) == int(
-                        goal.object_id
-                    ), f"Object_id doesn't correspond to id in semantic scene objects dictionary for episode: {episode}"
-
-                    center = sem_scene.objects[object_id].aabb.center
-                    x_len, _, z_len = (
-                        sem_scene.objects[object_id].aabb.sizes / 2.0
-                    )
-                    # Nodes to draw rectangle
-                    corners = [
-                        center + np.array([x, 0, z])
-                        for x, z in [
-                            (-x_len, -z_len),
-                            (-x_len, z_len),
-                            (x_len, z_len),
-                            (x_len, -z_len),
-                            (-x_len, -z_len),
-                        ]
-                    ]
-
-                    map_corners = [
-                        maps.to_grid(self.client, position[0], position[2])
-                        for p in corners
-                    ]
-
-                    maps.draw_path(
-                        self._top_down_map,
-                        map_corners,
-                        maps.MAP_TARGET_BOUNDING_BOX,
-                        self.line_thickness,
-                    )
-                except AttributeError:
-                    pass
-
 
     def reset_metric(self, *args: Any, **kwargs: Any):
         self._step_count = 0
@@ -1020,6 +948,7 @@ class TopDownMap(Measure):
                 map_agent_x - (self._ind_x_min - self._grid_delta),
             ),
             "agent_angle": self._sim.get_agent_state()["rotation"],
+            "fog_not_clip": self._fog_of_war_mask
         }
 
     def get_polar_angle(self):
@@ -1034,9 +963,18 @@ class TopDownMap(Measure):
         phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
         x_y_flip = -np.pi / 2
         return np.array(phi) + x_y_flip
+    
+    def _draw_point(self, position, point_type):
+        t_x, t_y = maps.to_grid(self.client, position[2], position[0])    
+        
+        self._top_down_map[
+            t_x - self.point_padding : t_x + self.point_padding + 1,
+            t_y - self.point_padding : t_y + self.point_padding + 1,
+        ] = point_type
 
     def update_map(self, agent_position):
         a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
+        print(f"#######({a_x}, {a_y})##############")
         """
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
@@ -1127,9 +1065,10 @@ class ExploredMap(Measure):
 
     def _draw_point(self, position, point_type):
         t_x, t_y = maps.to_grid(self.client, position[0], position[2])    
+        
         self._top_down_map[
-            t_x - self.point_padding : t_x + self.point_padding + 1,
             t_y - self.point_padding : t_y + self.point_padding + 1,
+            t_x - self.point_padding : t_x + self.point_padding + 1,
         ] = point_type
 
         if self._ind_x_min > t_x - self.point_padding:
@@ -1163,10 +1102,6 @@ class ExploredMap(Measure):
         self.start_position_y = agent_position[2]
         self.start_grid_x = a_x
         self.start_grid_y = a_y
-
-        for i in range(-2,3):
-            for j in range(-2,3):
-                self._top_down_map
 
         self._previous_xy_location = (a_y, a_x)
 
@@ -1214,18 +1149,6 @@ class ExploredMap(Measure):
             "start_position": (self.start_position_x, self.start_position_y),
         }
 
-    def get_polar_angle(self):
-        agent_state = self._sim.get_agent_state()
-        # quaternion is in x, y, z, w format
-        ref_rotation = agent_state["rotation"]
-
-        heading_vector = quaternion_rotate_vector(
-            ref_rotation.inverse(), np.array([0, 0, -1])
-        )
-
-        phi = cartesian_to_polar(-heading_vector[2], heading_vector[0])[1]
-        x_y_flip = -np.pi / 2
-        return np.array(phi) + x_y_flip
 
     def update_map(self, agent_position):
         a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
@@ -1655,9 +1578,7 @@ class MoveForwardAction(Action):
         print("MOVE_FORWARD " + str(self._meter) + "[m]")
         
         is_success = move(self._client, x+delta_x, y+delta_y, theta_rad, self._sim)
-        if is_success == True:
-            self.pre_obs = self._sim.get_observations_at()
-        return self.pre_obs
+        return self._sim.get_observations_at(), is_success
 
     def set_client(self, client):
         self._client = client
@@ -1680,9 +1601,7 @@ class TurnLeftAction(Action):
         print("TURN_LEFT " + str(self._angle) + "[度]")
         
         is_success = move(self._client, x, y, theta_rad+angle, self._sim)
-        if is_success == True:
-            self.pre_obs = self._sim.get_observations_at()
-        return self.pre_obs
+        return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
         self._client = client
@@ -1705,9 +1624,7 @@ class TurnRightAction(Action):
         print("TURN_RIGHT " + str(-self._angle) + "[度]")
         
         is_success = move(self._client, x, y, theta_rad+angle, self._sim)
-        if is_success == True:
-            self.pre_obs = self._sim.get_observations_at()
-        return self.pre_obs
+        return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
         self._client = client
