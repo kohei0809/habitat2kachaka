@@ -465,6 +465,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         print("Get the shelf and Go to the Start")
         #sclient.move_shelf("S01", "L01")
         client.move_shelf("S01", "start")
+        #client.move_shelf("S01", "start2")
         client.set_auto_homing_enabled(False)
         
         self.device = (
@@ -480,7 +481,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
             
         # evaluate multiple checkpoints in order
-        checkpoint_index = 50
+        #checkpoint_index = 50
+        checkpoint_index = 120
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None

@@ -203,7 +203,16 @@ def recreate_map(map_data):
         for j in range(map_data.shape[1]):
             # 村田研究室ゾーン
             if i > 175:
-                map_data[i][j] = 0     
+                map_data[i][j] = 0  
+            if (i == 175) and (map_data[i][j] == 1):
+                map_data[i][j] = 2
+            # 机 
+            if (i >= 70) and (i <= 153) and(j >= 59) and (j <= 81):
+                map_data[i][j] = 0
+            if i <= 56:
+                map_data[i][j] = 0
+            if (i == 57) and (map_data[i][j] == 1):
+                map_data[i][j] = 2
     
     # 境界線をちゃんと作る
     for i in range(map_data.shape[0]):
@@ -222,7 +231,7 @@ def recreate_map(map_data):
                             map_data[i][j] = 2
                             flag = True
                             break
-    """    
+
     map_manager = LogManager()
     map_manager.setLogDirectory("Map")
     map_logger = map_manager.createLogWriter("map_logger")
@@ -231,7 +240,9 @@ def recreate_map(map_data):
         for j in range(map_data.shape[1]):
             map_logger.write(map_data[i][j])
         map_logger.writeLine()
-    """
+        
+    print("Create Map Logger")
+
                        
     return map_data
     

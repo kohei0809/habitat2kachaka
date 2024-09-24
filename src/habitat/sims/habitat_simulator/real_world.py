@@ -276,6 +276,17 @@ class RealWorld(Simulator):
             self.theta_rad = pos.theta + math.pi/2
         
         return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
+    
+    def get_agent_state2(self):
+        if self.is_reset_postion == False:
+            pos = self._client.get_robot_pose()
+            self.x = pos.x
+            self.y = pos.y
+            self.z = 0.0
+            self.theta_rad = pos.theta
+        
+        return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
+
 
     def _get_agent_config(self, agent_id: Optional[int] = None) -> Any:
         if agent_id is None:

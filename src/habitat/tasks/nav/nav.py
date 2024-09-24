@@ -107,6 +107,68 @@ def move(client, x, y, theta, _sim):
             client.speak("再実行します。")
 
 
+def move_forward(client, move_meter, x, y, theta, _sim):
+    print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
+    
+    while True:
+        get_thread = threading.Thread(target=client.move_forward, args=(move_meter))
+        get_thread.start()
+        get_thread.join(10)  # get関数の終了を待つ（最大10秒）
+
+        if get_thread.is_alive():
+            print("move関数は10秒以上かかりました。強制終了します。")
+            client.speak("move関数は10秒以上かかりました。強制終了します。")
+            _sim.reset_position()
+            return False
+        
+        #client.move_to_pose(x, y, theta)
+        _sim.unreset_position()
+        result = client.get_last_command_result()[0]
+        if result.success:
+            #print("Success!")
+            return True
+        else:
+            with open(f"/home/{os.environ['USER']}/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
+                error_codes = json.load(f)
+            for error_code in error_codes:
+                if int(error_code["code"]) == result.error_code:
+                    error_title = error_code["title"]
+                    error_description = error_code["description"]
+                    print(f"Failure: {error_title}\n{error_description}")
+            client.speak("再実行します。")
+
+
+def rotate_in_place(client, rotate_angle, x, y, theta, _sim):
+    print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
+    
+    while True:
+        get_thread = threading.Thread(target=client.rotate_in_place, args=(rotate_angle))
+        get_thread.start()
+        get_thread.join(10)  # get関数の終了を待つ（最大10秒）
+
+        if get_thread.is_alive():
+            print("move関数は10秒以上かかりました。強制終了します。")
+            client.speak("move関数は10秒以上かかりました。強制終了します。")
+            _sim.reset_position()
+            return False
+        
+        #client.move_to_pose(x, y, theta)
+        _sim.unreset_position()
+        result = client.get_last_command_result()[0]
+        if result.success:
+            #print("Success!")
+            return True
+        else:
+            with open(f"/home/{os.environ['USER']}/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
+                error_codes = json.load(f)
+            for error_code in error_codes:
+                if int(error_code["code"]) == result.error_code:
+                    error_title = error_code["title"]
+                    error_description = error_code["description"]
+                    print(f"Failure: {error_title}\n{error_description}")
+            client.speak("再実行します。")
+
+
 @attr.s(auto_attribs=True, kw_only=True)
 class NavigationGoal:
     r"""Base class for a goal specification hierarchy.
@@ -1568,16 +1630,24 @@ class MoveForwardAction(Action):
         """
         task.is_found_called = False 
         
+        """
         pos = self._client.get_robot_pose()
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
+        """
+        state = self._sim.get_agent_state2()
+        x = state["position"][0]
+        y = state["position"][2]
+        theta_rad = state["rotation"]
         
         delta_x = self._meter * math.cos(theta_rad)
-        delta_y = self._meter * math.sin(theta_rad)   
+        delta_y = self._meter * math.sin(theta_rad)  
+        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
         print("MOVE_FORWARD " + str(self._meter) + "[m]")
         
-        is_success = move(self._client, x+delta_x, y+delta_y, theta_rad, self._sim)
+        #is_success = move(self._client, x+delta_x, y+delta_y, theta_rad, self._sim)
+        is_success = move_forward(self._client, self._meter, x+delta_x, y+delta_y, theta_rad, self._sim)
         return self._sim.get_observations_at(), is_success
 
     def set_client(self, client):
@@ -1592,15 +1662,23 @@ class TurnLeftAction(Action):
         """
         task.is_found_called = False 
         
+        """
         pos = self._client.get_robot_pose()
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
+        """
+        state = self._sim.get_agent_state2()
+        x = state["position"][0]
+        y = state["position"][2]
+        theta_rad = state["rotation"]
         
         angle = math.radians(self._angle)
+        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
         print("TURN_LEFT " + str(self._angle) + "[度]")
         
-        is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        #is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        is_success = rotate_in_place(self._client, self._angle, x, y, theta_rad+angle, self._sim)
         return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
@@ -1616,14 +1694,23 @@ class TurnRightAction(Action):
         """
         task.is_found_called = False
         
+        """
         pos = self._client.get_robot_pose()
         x = pos.x
         y = pos.y
         theta_rad = pos.theta
+        """
+        state = self._sim.get_agent_state2()
+        x = state["position"][0]
+        y = state["position"][2]
+        theta_rad = state["rotation"]
+        
         angle = math.radians(-self._angle)
+        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
         print("TURN_RIGHT " + str(-self._angle) + "[度]")
         
-        is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        #is_success = move(self._client, x, y, theta_rad+angle, self._sim)
+        is_success = rotate_in_place(self._client, self._angle, x, y, theta_rad+angle, self._sim)
         return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
