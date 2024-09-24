@@ -1,3 +1,0 @@
-demos
-kachaka_api
-src

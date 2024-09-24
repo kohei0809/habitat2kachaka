@@ -121,6 +121,18 @@ class KachakaApiClient(KachakaApiClientBase):
             self.object_detection.set_tuple_callback
         )
 
+        self.object_detection_features = TupleResponseHandler[
+            pb2.GetObjectDetectionFeaturesResponse,
+            tuple[pb2.RosHeader, RepeatedCompositeContainer],
+            [pb2.RosHeader, RepeatedCompositeContainer],
+        ](
+            self.stub.GetObjectDetectionFeatures,
+            lambda r: (r.header, r.features),
+        )
+        self.object_detection_features_callback = (
+            self.object_detection_features.set_tuple_callback
+        )
+
         self.ros_imu = ResponseHandler[pb2.GetRosImuResponse, pb2.RosImu](
             self.stub.GetRosImu, lambda r: r.imu
         )
@@ -130,6 +142,13 @@ class KachakaApiClient(KachakaApiClientBase):
             pb2.GetRosOdometryResponse, pb2.RosOdometry
         ](self.stub.GetRosOdometry, lambda r: r.odometry)
         self.set_ros_odometry_callback = self.ros_odometry.set_callback
+
+        self.ros_wheel_odometry = ResponseHandler[
+            pb2.GetRosWheelOdometryResponse, pb2.RosOdometry
+        ](self.stub.GetRosWheelOdometry, lambda r: r.odometry)
+        self.set_ros_wheel_odometry_callback = (
+            self.ros_wheel_odometry.set_callback
+        )
 
         self.ros_laser_scan = ResponseHandler[
             pb2.GetRosLaserScanResponse, pb2.RosLaserScan
@@ -171,10 +190,25 @@ class KachakaApiClient(KachakaApiClientBase):
         ](self.stub.GetShelves, lambda r: r.shelves)
         self.set_shelves_callback = self.shelves.set_callback
 
+        self.moving_shelf_id = ResponseHandler[
+            pb2.GetMovingShelfIdResponse, str
+        ](self.stub.GetMovingShelfId, lambda r: r.shelf_id)
+        self.set_moving_shelf_id_callback = self.moving_shelf_id.set_callback
+
         self.locations = ResponseHandler[
             pb2.GetLocationsResponse, RepeatedCompositeContainer
         ](self.stub.GetLocations, lambda r: r.locations)
         self.set_locations_callback = self.locations.set_callback
+
+        self.map_list = ResponseHandler[
+            pb2.GetMapListResponse, RepeatedCompositeContainer
+        ](self.stub.GetMapList, lambda r: r.map_list_entries)
+        self.set_map_list_callback = self.map_list.set_callback
+
+        self.current_map_id = ResponseHandler[pb2.GetCurrentMapIdResponse, str](
+            self.stub.GetCurrentMapId, lambda r: r.id
+        )
+        self.set_current_map_id_callback = self.current_map_id.set_callback
 
         self.history_list = ResponseHandler[
             pb2.GetHistoryListResponse, RepeatedCompositeContainer
@@ -194,3 +228,8 @@ class KachakaApiClient(KachakaApiClientBase):
         self.set_manual_control_enabled_callback = (
             self.manual_control_enabled.set_callback
         )
+
+        self.error = ResponseHandler[pb2.GetErrorResponse, list[int]](
+            self.stub.GetError, lambda r: r.error_codes
+        )
+        self.set_error_callback = self.error.set_callback

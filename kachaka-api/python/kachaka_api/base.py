@@ -13,6 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import socket
+from typing import Iterator, NamedTuple, TypedDict
+
 import grpc
 from google._upb._message import RepeatedCompositeContainer
 
@@ -24,9 +28,42 @@ MAX_LINEAR_VELOCITY = 0.3
 MAX_ANGULAR_VELOCITY = 1.57
 
 
+class ErrorCode(NamedTuple):
+    code: int
+    error_type: str
+    title: str
+    description: str
+    title_en: str
+    description_en: str
+    ref_url: str
+
+
+def _resolve_hostname(domain: str) -> str | None:
+    try:
+        return socket.gethostbyname(domain)
+    except socket.gaierror:
+        return None
+
+
+def _resolve_target(target: str) -> str | None:
+    try:
+        hostname, port = target.split(":")
+    except ValueError:
+        return None
+
+    ip = _resolve_hostname(hostname)
+    if ip is None:
+        return None
+
+    return f"{ip}:{port}"
+
+
 class KachakaApiClientBase:
     def __init__(self, target: str = "100.94.1.1:26400"):
-        self.stub = KachakaApiStub(grpc.insecure_channel(target))
+        target_resolved = _resolve_target(target)
+        if target_resolved is None:
+            raise ValueError(f"Invalid target: {target}")
+        self.stub = KachakaApiStub(grpc.insecure_channel(target_resolved))
         self.resolver = ShelfLocationResolver()
 
     def get_robot_serial_number(self) -> str:
@@ -53,6 +90,11 @@ class KachakaApiClientBase:
         response: pb2.GetPngMapResponse = self.stub.GetPngMap(request)
         return response.map
 
+    def get_battery_info(self) -> tuple[float, pb2.PowerSupplyStatus]:
+        request = pb2.GetRequest()
+        response: pb2.GetBatteryInfoResponse = self.stub.GetBatteryInfo(request)
+        return (response.battery_percentage, response.power_supply_status)
+
     def get_object_detection(
         self,
     ) -> tuple[pb2.RosHeader, RepeatedCompositeContainer]:
@@ -62,6 +104,15 @@ class KachakaApiClientBase:
         )
         return (response.header, response.objects)
 
+    def get_object_detection_features(
+        self,
+    ) -> tuple[pb2.RosHeader, RepeatedCompositeContainer]:
+        request = pb2.GetRequest()
+        response: pb2.GetObjectDetectionFeaturesResponse = (
+            self.stub.GetObjectDetectionFeatures(request)
+        )
+        return (response.header, response.features)
+
     def get_ros_imu(self) -> pb2.RosImu:
         request = pb2.GetRequest()
         response: pb2.GetRosImuResponse = self.stub.GetRosImu(request)
@@ -70,6 +121,13 @@ class KachakaApiClientBase:
     def get_ros_odometry(self) -> pb2.RosOdometry:
         request = pb2.GetRequest()
         response: pb2.GetRosOdometryResponse = self.stub.GetRosOdometry(request)
+        return response.odometry
+
+    def get_ros_wheel_odometry(self) -> pb2.RosOdometry:
+        request = pb2.GetRequest()
+        response: pb2.GetRosWheelOdometryResponse = (
+            self.stub.GetRosWheelOdometry(request)
+        )
         return response.odometry
 
     def get_ros_laser_scan(self) -> pb2.RosLaserScan:
@@ -102,6 +160,56 @@ class KachakaApiClientBase:
         )
         return response.image
 
+    def get_back_camera_ros_camera_info(self) -> pb2.RosCameraInfo:
+        request = pb2.GetRequest()
+        response: pb2.GetBackCameraRosCameraInfoResponse = (
+            self.stub.GetBackCameraRosCameraInfo(request)
+        )
+        return response.camera_info
+
+    def get_back_camera_ros_image(self) -> pb2.RosImage:
+        request = pb2.GetRequest()
+        response: pb2.GetBackCameraRosImageResponse = (
+            self.stub.GetBackCameraRosImage(request)
+        )
+        return response.image
+
+    def get_back_camera_ros_compressed_image(
+        self,
+    ) -> pb2.RosCompressedImage:
+        request = pb2.GetRequest()
+        response: pb2.GetBackCameraRosCompressedImageResponse = (
+            self.stub.GetBackCameraRosCompressedImage(request)
+        )
+        return response.image
+
+    def get_tof_camera_ros_camera_info(self) -> pb2.RosCameraInfo:
+        request = pb2.GetRequest()
+        response: pb2.GetTofCameraRosCameraInfoResponse = (
+            self.stub.GetTofCameraRosCameraInfo(request)
+        )
+        return response.camera_info
+
+    def get_tof_camera_ros_image(self) -> pb2.RosImage:
+        request = pb2.GetRequest()
+        response: pb2.GetTofCameraRosImageResponse = (
+            self.stub.GetTofCameraRosImage(request)
+        )
+        if not response.is_available:
+            raise Exception("tof is not available on charger.")
+        return response.image
+
+    def get_tof_camera_ros_compressed_image(
+        self,
+    ) -> pb2.RosCompressedImage:
+        request = pb2.GetRequest()
+        response: pb2.GetTofCameraRosCompressedImageResponse = (
+            self.stub.GetTofCameraRosCompressedImage(request)
+        )
+        if not response.is_available:
+            raise Exception("tof is not available on charger.")
+        return response.image
+
     def start_command(
         self,
         command: pb2.Command,
@@ -128,16 +236,16 @@ class KachakaApiClientBase:
         if not response.result.success or not wait_for_completion:
             return response.result
         while True:
-            command_state_response: pb2.GetCommandStateResponse = (
-                self.stub.GetCommandState(
+            command_result_response: pb2.GetLastCommandResultResponse = (
+                self.stub.GetLastCommandResult(
                     pb2.GetRequest(metadata=command_state_metadata)
                 )
             )
-            if command_state_response.state == pb2.COMMAND_STATE_PENDING:
-                break
             command_state_metadata.cursor = (
-                command_state_response.metadata.cursor
+                command_result_response.metadata.cursor
             )
+            if command_result_response.command_id == response.command_id:
+                break
         return (self.get_last_command_result())[0]
 
     def move_shelf(
@@ -295,6 +403,48 @@ class KachakaApiClientBase:
             title=title,
         )
 
+    def move_forward(
+        self,
+        distance_meter: float,
+        *,
+        wait_for_completion: bool = True,
+        cancel_all: bool = True,
+        tts_on_success: str = "",
+        title: str = "",
+    ) -> pb2.Result:
+        return self.start_command(
+            pb2.Command(
+                move_forward_command=pb2.MoveForwardCommand(
+                    distance_meter=distance_meter
+                )
+            ),
+            wait_for_completion=wait_for_completion,
+            cancel_all=cancel_all,
+            tts_on_success=tts_on_success,
+            title=title,
+        )
+
+    def rotate_in_place(
+        self,
+        angle_radian: float,
+        *,
+        wait_for_completion: bool = True,
+        cancel_all: bool = True,
+        tts_on_success: str = "",
+        title: str = "",
+    ) -> pb2.Result:
+        return self.start_command(
+            pb2.Command(
+                rotate_in_place_command=pb2.RotateInPlaceCommand(
+                    angle_radian=angle_radian
+                )
+            ),
+            wait_for_completion=wait_for_completion,
+            cancel_all=cancel_all,
+            tts_on_success=tts_on_success,
+            title=title,
+        )
+
     def cancel_command(self) -> tuple[pb2.Result, pb2.Command]:
         request = pb2.EmptyRequest()
         response: pb2.CancelCommandResponse = self.stub.CancelCommand(request)
@@ -347,6 +497,18 @@ class KachakaApiClientBase:
         response: pb2.GetShelvesResponse = self.stub.GetShelves(request)
         return response.shelves
 
+    def get_moving_shelf_id(self) -> str:
+        request = pb2.GetRequest()
+        response: pb2.GetMovingShelfIdResponse = self.stub.GetMovingShelfId(
+            request
+        )
+        return response.shelf_id
+
+    def reset_shelf_pose(self, shelf_id: str) -> pb2.Result:
+        request = pb2.ResetShelfPoseRequest(shelf_id=shelf_id)
+        response: pb2.ResetShelfPoseResponse = self.stub.ResetShelfPose(request)
+        return response.result
+
     def set_auto_homing_enabled(self, enable: bool) -> pb2.Result:
         request = pb2.SetAutoHomingEnabledRequest(enable=enable)
         response: pb2.SetAutoHomingEnabledResponse = (
@@ -398,12 +560,156 @@ class KachakaApiClientBase:
         self.set_robot_velocity(0, 0)
         self.set_manual_control_enabled(False)
 
+    def get_map_list(self) -> RepeatedCompositeContainer:
+        request = pb2.GetRequest()
+        response: pb2.GetMapListResponse = self.stub.GetMapList(request)
+        return response.map_list_entries
+
+    def get_current_map_id(self) -> str:
+        request = pb2.GetRequest()
+        response: pb2.GetCurrentMapIdResponse = self.stub.GetCurrentMapId(
+            request
+        )
+        return response.id
+
+    def load_map_preview(self, map_id: str) -> tuple[pb2.Result, pb2.Map]:
+        request = pb2.LoadMapPreviewRequest(map_id=map_id)
+        response: pb2.LoadMapPreviewResponse = self.stub.LoadMapPreview(request)
+        return response.map
+
+    def export_map(self, map_id: str, output_file_path: str) -> pb2.Result:
+        request = pb2.ExportMapRequest(map_id=map_id)
+        responses: Iterator[pb2.ExportMapResponse] = self.stub.ExportMap(
+            request
+        )
+        data = bytes()
+        result = pb2.Result(success=False)
+        for response in responses:
+            if response.HasField("middle_of_stream"):
+                data += response.middle_of_stream.data
+            elif response.HasField("end_of_stream"):
+                result = response.end_of_stream.result
+
+        if not result.success:
+            return result
+
+        with open(output_file_path, "wb") as file:
+            file.write(data)
+        return result
+
+    def import_map(
+        self, target_file_path: str, chunk_size: int = 1024 * 1024
+    ) -> tuple[pb2.Result, str]:
+        def request_iterator() -> Iterator[pb2.ImportMapRequest]:
+            with open(target_file_path, mode="rb") as file:
+                while True:
+                    chunk: bytes = file.read(chunk_size)
+                    if not chunk:
+                        break
+                    yield pb2.ImportMapRequest(data=chunk)
+
+        response: pb2.ImportMapResponse = self.stub.ImportMap(
+            request_iterator()
+        )
+        return response.result, response.map_id
+
+    def get_shortcuts(self) -> dict[str, str]:
+        request = pb2.GetRequest()
+        response: pb2.GetShortcutsResponse = self.stub.GetShortcuts(request)
+        return {item.id: item.name for item in response.shortcuts}
+
+    def start_shortcut_command(
+        self, target_shortcut_id: str, cancel_all: bool = True
+    ) -> pb2.Result:
+        request = pb2.StartShortcutCommandRequest(
+            target_shortcut_id=target_shortcut_id, cancel_all=cancel_all
+        )
+        response: pb2.StartShortcutCommandResponse = (
+            self.stub.StartShortcutCommand(request)
+        )
+        return response.result
+
+    class Pose2d(TypedDict):
+        x: float
+        y: float
+        theta: float
+
+    def switch_map(
+        self, map_id: str, *, pose: Pose2d | None = None
+    ) -> pb2.Result:
+        # If "pose" is not specified, the initial pose is automatically determined to the charger pose.
+        initial_pose = (
+            pb2.Pose(x=pose["x"], y=pose["y"], theta=pose["theta"])
+            if pose
+            else None
+        )
+        request = pb2.SwitchMapRequest(map_id=map_id, initial_pose=initial_pose)
+        response: pb2.SwitchMapResponse = self.stub.SwitchMap(request)
+        return response.result
+
     def get_history_list(
         self,
     ) -> RepeatedCompositeContainer:
         request = pb2.GetRequest()
         response: pb2.GetHistoryListResponse = self.stub.GetHistoryList(request)
         return response.histories
+
+    def get_speaker_volume(self) -> int:
+        """
+        Get the current volume of the speaker. The volume is in the range of 0 to 10.
+        """
+        request = pb2.GetRequest()
+        response: pb2.GetSpeakerVolumeResponse = self.stub.GetSpeakerVolume(
+            request
+        )
+        return response.volume
+
+    def set_speaker_volume(self, volume: int) -> pb2.Result:
+        """
+        Set the volume of the speaker. The volume is in the range of 0 to 10.
+        """
+        request = pb2.SetSpeakerVolumeRequest(volume=volume)
+        response: pb2.SetSpeakerVolumeResponse = self.stub.SetSpeakerVolume(
+            request
+        )
+        return response.result
+
+    def restart_robot(self) -> pb2.Result:
+        request = pb2.EmptyRequest()
+        response: pb2.RestartRobotResponse = self.stub.RestartRobot(request)
+        return response.result
+
+    def get_error(self) -> list[int]:
+        request = pb2.GetRequest()
+        response: pb2.GetErrorResponse = self.stub.GetError(request)
+        return response.error_codes
+
+    def get_robot_error_code(self) -> dict[int, ErrorCode]:
+        request = pb2.EmptyRequest()
+        response: pb2.GetRobotErrorCodeJsonResponse = (
+            self.stub.GetRobotErrorCodeJson(request)
+        )
+        return {
+            item["code"]: (
+                ErrorCode(
+                    item["code"],
+                    item["error_type"],
+                    item["title"],
+                    item["description"],
+                    item["title_en"],
+                    item["description_en"],
+                    item["ref_url"],
+                )
+            )
+            for item in json.loads(response.json)
+        }
+
+    def set_emergency_stop(self) -> int:
+        request = pb2.EmptyRequest()
+        response: pb2.SetEmergencyStopResponse = self.stub.SetEmergencyStop(
+            request
+        )
+        return response.result.error_code
 
     def update_resolver(self) -> None:
         self.resolver.set_shelves(self.get_shelves())

@@ -17,14 +17,10 @@
   - [使用方法](#使用方法)
   - [カチャカAPIライブラリのサンプルコード](#カチャカapiライブラリのサンプルコード)
 - [gRPC](#grpc)
-  - [PythonによるgRPCクライアント開発の準備（PCで行う場合）](#pythonによるgrpcクライアント開発の準備pcで行う場合)
-  - [PythonによるgRPCクライアント開発の準備（カチャカにsshして行う場合）](#pythonによるgrpcクライアント開発の準備カチャカにsshして行う場合)
-  - [gRPC サンプルコード一覧](#grpc-サンプルコード一覧)
-  - [サンプルコードの実行方法](#サンプルコードの実行方法)
-  - [Cursor の概念](#cursor-の概念)
 - [ROS 2](#ros-2)
   - [ROS 2 Humbleのセットアップ](#ros-2-humbleのセットアップ)
   - [Dockerのセットアップ](#dockerのセットアップ)
+  - [Dockerイメージのビルド](#dockerイメージのビルド)
   - [サンプルコードのダウンロード](#サンプルコードのダウンロード)
   - [kachaka\_interfaces, kachaka\_descriptionのビルド](#kachaka_interfaces-kachaka_descriptionのビルド)
   - [動作確認](#動作確認)
@@ -102,13 +98,14 @@
 
 ![kachaka-api](docs/images/kachka-api.png)
 
-## 前提条件
 
-* カチャカ本体内で動作するJupyterLabに関しては、ブラウザのみ用意すれば使用する事ができます。
+## 対応環境・言語
+
+* カチャカ本体内で動作するJupyterLabを利用することで、OSを問わずWebブラウザのみ用意すれば開発を行うことができます。
   * 対応ブラウザについては、[JupyterLab公式ドキュメント](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html#supported-browsers)をご確認ください。
-* カチャカの外部から本書の手順に従ってカチャカAPIを使用する場合には、以下の条件に準拠したソフトウェアをインストールしたPCが必要となります。
-    * OS
-        *  Ubuntu 22.04 LTS
+* カチャカ外部のPCからAPIを利用することも可能で、本ドキュメントの内容は以下の環境にて確認していますが、多くはmacOSやWindowsなど他の環境でも可能です。
+    * 動作確認済みのOS
+        * Ubuntu 22.04 LTS
     * 開発言語
         * Python3.10
     * ROS 2（使用する場合）
@@ -230,207 +227,9 @@ callback機能については[sample_llm_speak.py](python/demos/sample_llm_speak
 
 ## gRPC
 
-* ここではPythonを用いてgRPCを使用する方法を説明します。
-    * その他の言語については、以下の情報をご参照ください。
-        * https://grpc.io/docs/
+* ライブラリを用いなくても、gRPCのインターフェースで直接カチャカAPIを利用することも可能です。
+* 詳細は[gRPC](./docs/GRPC.md)をご参照ください。
 
-
-### PythonによるgRPCクライアント開発の準備（PCで行う場合）
-
-* この章の説明はNotebookではなくPCのTerminalによる実行を想定しています。
-* 以下のコマンドを実行し、サンプルコードをダウンロードします。
-
-```
-cd ~
-git clone https://github.com/pf-robotics/kachaka-api.git
-``` 
-
-* 以下のコマンドを実行すると、gRPC の API 定義ファイルから gRPC を利用するのに必要なコードが生成されます。
-  
-```
-cd ~
-python3 -m venv venv
-source venv/bin/activate
-
-cd ~/kachaka-api/python/demos
-pip install -r requirements.txt 
-
-python -m grpc_tools.protoc -I../../protos --python_out=. --pyi_out=. --grpc_python_out=. ../../protos/kachaka-api.proto
-```
-
-
-### PythonによるgRPCクライアント開発の準備（カチャカにsshして行う場合）
-
-* この章の説明はNotebookではなくTerminalによる実行を想定しています。カチャカにsshするか、JupyterLabのTerminal機能を利用してください。
-    * sshの手順はPlaygroundの項目を参照してください。
-* kachaka-api.protoファイルは予めPlaygoundにインストール済みですので、すぐに開発を始めることができます。
-* サンプルコードは「サンプルコードをJupyterLabで実行する」の項目の手順を参考にダウンロードします。
-
-### gRPC サンプルコード一覧
-
-[python/demos/grpc_samples](python/demos/grpc_samples) にgrpcを利用したサンプルコードがあります。
-
-### gRPC サンプルコードの実行方法
-
-* 目的地一覧を取得する(GetLocations)を実行する例
-    * ソースコード: [python/demos/grpc_samples/get_locations.py](python/demos/grpc_samples/get_locations.py)
-
-実行
-
-* PCで実行する場合、以下のコマンドを実行します。
-    * &lt;カチャカのIPアドレス>部分は、スマートフォンアプリに表示されるIPアドレスを入力します。
-
-```
-cd ~
-source venv/bin/activate
-cd ~/kachaka-api/python/demos/grpc_samples
-python get_locations.py <カチャカのIPアドレス>:26400
-```
-
-* Playground内から実行する場合、まずsshでPlaygroundにログインします。
-    * ログイン後、以下のコマンドを実行します。
-        * Playground内から実行する場合は、IPアドレスは100.94.1.1とします。
-
-```
-cd ~/kachaka-api/python/demos/grpc_samples
-python3 get_locations.py 100.94.1.1:26400
-```
-
-実行結果の例
-
-スマートフォンアプリで登録済みの目的地が表示されます。
-
-```
-metadata {
-  cursor: 1902856679949
-}
-locations {
-  id: "L01"
-  name: "ダイニング"
-  pose {
-    x: 1.33572
-    y: 2.328592
-  }
-}
-locations {
-  id: "home"
-  name: "充電ドック"
-  pose {
-    x: 0.136266
-    y: -0.037587
-    theta: 0.021679
-  }
-  type: LOCATION_TYPE_CHARGER
-}
-default_location_id: "L01"
-
-```
-
-### Cursor の概念
-
-データを取得するAPIは、以下の目的のために、cursor による既読管理とロングポーリング([Wikipedia](https://ja.wikipedia.org/wiki/Push%E6%8A%80%E8%A1%93#Long_polling))を導入しています。
-
-* クライアントが既に受け取ったデータを重複して受け取らない
-* クライアント側で受け取れていないデータはサーバから再送される
-* クライアント側の処理が滞った場合に、適切に古いデータが破棄され、最新のデータだけ送信される
-* サーバ側でデータが生成されたタイミングで受信できる
-
-サーバから既読管理に対応したデータを送信するとき、metadataのcursorにある数値を入れて送ります。クライアントはリクエスト時にmetadataのcursorに前回サーバから返答されたcursorを埋め込みます。サーバは送られてきたcursorが最新のcursorと違うときのみ最新のデータを送り、同じならば新しいデータが用意できるまで返答を遅延します。
-
-起動直後などクライアントがデータを持っていない場合には、特殊なcursor(0)を送ることでサーバはその時点での最新のデータを返します。
-
-常にリクエスト時の最新のデータが欲しい場合には、毎回cursor=0としてリクエストすれば良いです。
-
-#### cursor を設定しない(0に設定する)ときの挙動
-
-```mermaid
-sequenceDiagram
-  participant C as gRPC Client
-  box Gray Kachaka
-  participant B as gRPC Server
-  participant R as Internal system
-  end
-
-  C ->>+ B: Get (cursor = 0)
-  Note over B: データが来るまで待ちます<br/>(ロングポーリング)
-  R -->> B: data
-  B -->>- C: 
-  Note left of B: データが届き次第、すぐに返信します
-```
-
-```mermaid
-sequenceDiagram
-  participant C as gRPC Client
-  box Gray Kachaka
-  participant B as gRPC Server
-  participant R as Internal system
-  end
-
-  R -->> B: data
-  Note right of B: データが既にある場合
-  C ->>+ B: Get (cursor = 0)
-  B -->>- C: 
-  Note left of B: あるデータですぐに返信します
-```
-
-#### データの提供が高頻度で、全てを取得するのではなくて、最新のデータだけ欲しい場合
-
-```mermaid
-sequenceDiagram
-  participant C as gRPC Client
-  box Gray Kachaka
-  participant B as gRPC Server
-  participant R as Internal system
-  end
-
-  R -->> B: data (cursor = 100)
-  C ->>+ B: Get (cursor = 0)
-  B -->>- C: 
-  Note over C: cursor = 100 を取得したので、<br/>それを次の Get に利用します
-
-  R -->> B: data (cursor = 110)
-  R -->> B: data (cursor = 120)
-
-  C ->>+ B: Get (cursor = 100)
-  B -->>- C: 
-  Note over C: cursor = 120 を取得したので、<br/>それを次の Get に利用します
-  R -->> B: data (cursor = 130)
-
-  R -->> B: data (cursor = 140)
-  R -->> B: data (cursor = 150)
-
-  C ->>+ B: Get (cursor = 120)
-  B -->>- C: 
-  Note over C: cursor = 150 を取得したので、<br/>それを次の Get に利用します
-  R -->> B: data (cursor = 160)
-
-```
-
-#### データがごくまれにしか更新されない場合
-
-```mermaid
-sequenceDiagram
-  participant C as gRPC Client
-  box Gray Kachaka
-  participant B as gRPC Server
-  participant R as Internal system
-  end
-
-  R -->> B: data (cursor = 100)
-  C ->>+ B: Get (cursor = 0)
-  B -->>- C: 
-
-  C ->>+ B: Get (cursor = 100)
-  Note over B: データが更新されるまで待ちます<br/>(ロングポーリング)
-  R -->> B: data (cursor = 110)
-  B -->>- C: 
-
-  C ->>+ B: Get (cursor = 110)
-  Note over B: データが更新されるまで待ちます<br/>(ロングポーリング)
-  R -->> B: data (cursor = 120)
-  B -->>- C: 
-
-```
 
 ## ROS 2
 
@@ -444,6 +243,20 @@ sequenceDiagram
 * 以下を参考に、Dockerの設定を行って下さい。
     * https://docs.docker.com/engine/install/ubuntu/
 
+### Dockerイメージのビルド
+
+* 初期設定では配布Dockerイメージを使って起動したDockerコンテナ上でros2_bridgeを動作させます。配布Dockerイメージを使う場合はこの手順はスキップしてください。
+* Dockerイメージをカスタマイズしたい場合、以下の手順でビルドします。
+    * 以下の実行例では`BASE_ARCH=x86_64`としていますが、ros2_bridgeをx86_64アーキテクチャのCPU上で実行させる場合の例です。
+    * ros2_bridgeをarm64アーキテクチャのCPU上で実行させる場合は`BASE_ARCH=arm64`としてください。
+
+```
+docker buildx build -t kachaka-api --target kachaka-grpc-ros2-bridge -f Dockerfile.ros2 . --build-arg BASE_ARCH=x86_64 --load
+```
+
+* [tools/ros2_bridge/docker-compose.yaml](tools/ros2_bridge/docker-compose.yaml)に対して以下の変更を行います。
+    * 変更前：`image: "asia-northeast1-docker.pkg.dev/kachaka-api/docker/kachaka-grpc-ros2-bridge:${TAG}"`
+    * 変更後：`image: kachaka-api:latest`
 
 ### サンプルコードのダウンロード
 
@@ -463,6 +276,7 @@ ln -s ~/kachaka-api/ros2/kachaka_interfaces/ kachaka_interfaces
 ln -s ~/kachaka-api/ros2/kachaka_description/ kachaka_description
 
 cd ~/ros2_ws
+source /opt/ros/humble/setup.bash
 colcon build
 ```
 

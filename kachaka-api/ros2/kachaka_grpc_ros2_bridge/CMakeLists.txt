@@ -31,6 +31,8 @@ ament_auto_add_library(
   gen-src/kachaka-api.grpc.pb.cc
   gen-src/kachaka-api.pb.cc
   src/component/auto_homing_component.cpp
+  src/component/back_camera_component.cpp
+  src/component/diagnostics_component.cpp
   src/component/dynamic_tf_component.cpp
   src/component/front_camera_component.cpp
   src/component/goal_pose_component.cpp
@@ -42,8 +44,11 @@ ament_auto_add_library(
   src/component/mapping_component.cpp
   src/component/object_detection_component.cpp
   src/component/odometry_component.cpp
+  src/component/wheel_odometry_component.cpp
   src/component/robot_info_component.cpp
   src/component/static_tf_component.cpp
+  src/component/tof_camera_component.cpp
+  src/component/torch_component.cpp
   src/converter/kachaka_command.cpp
   src/converter/ros_header.cpp
   src/dynamic_tf_bridge.cpp
@@ -57,6 +62,20 @@ rclcpp_components_register_node(
   "kachaka::grpc_ros2_bridge::AutoHomingComponent"
   EXECUTABLE
   auto_homing)
+
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN
+  "kachaka::grpc_ros2_bridge::BackCameraComponent"
+  EXECUTABLE
+  back_camera)
+
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN
+  "kachaka::grpc_ros2_bridge::DiagnosticsComponent"
+  EXECUTABLE
+  diagnostics)
 
 rclcpp_components_register_node(
   ${PROJECT_NAME}
@@ -134,6 +153,27 @@ rclcpp_components_register_node(
   "kachaka::grpc_ros2_bridge::OdometryComponent"
   EXECUTABLE
   odometry)
+
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN
+  "kachaka::grpc_ros2_bridge::WheelOdometryComponent"
+  EXECUTABLE
+  wheel_odometry)
+
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN
+  "kachaka::grpc_ros2_bridge::TofCameraComponent"
+  EXECUTABLE
+  tof_camera)
+
+rclcpp_components_register_node(
+  ${PROJECT_NAME}
+  PLUGIN
+  "kachaka::grpc_ros2_bridge::TorchComponent"
+  EXECUTABLE
+  torch)
 
 rclcpp_components_register_node(
   ${PROJECT_NAME}

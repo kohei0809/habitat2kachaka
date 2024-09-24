@@ -35,10 +35,20 @@ class KachakaApiStub(object):
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetPngMapResponse.FromString,
                 )
+        self.GetBatteryInfo = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetBatteryInfo',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetBatteryInfoResponse.FromString,
+                )
         self.GetObjectDetection = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetObjectDetection',
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetObjectDetectionResponse.FromString,
+                )
+        self.GetObjectDetectionFeatures = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetObjectDetectionFeatures',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetObjectDetectionFeaturesResponse.FromString,
                 )
         self.GetRosImu = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetRosImu',
@@ -49,6 +59,11 @@ class KachakaApiStub(object):
                 '/kachaka_api.KachakaApi/GetRosOdometry',
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetRosOdometryResponse.FromString,
+                )
+        self.GetRosWheelOdometry = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetRosWheelOdometry',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetRosWheelOdometryResponse.FromString,
                 )
         self.GetRosLaserScan = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetRosLaserScan',
@@ -70,6 +85,46 @@ class KachakaApiStub(object):
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetFrontCameraRosCompressedImageResponse.FromString,
                 )
+        self.GetBackCameraRosCameraInfo = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetBackCameraRosCameraInfo',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetBackCameraRosCameraInfoResponse.FromString,
+                )
+        self.GetBackCameraRosImage = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetBackCameraRosImage',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetBackCameraRosImageResponse.FromString,
+                )
+        self.GetBackCameraRosCompressedImage = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetBackCameraRosCompressedImage',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetBackCameraRosCompressedImageResponse.FromString,
+                )
+        self.GetTofCameraRosCameraInfo = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetTofCameraRosCameraInfo',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetTofCameraRosCameraInfoResponse.FromString,
+                )
+        self.GetTofCameraRosImage = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetTofCameraRosImage',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetTofCameraRosImageResponse.FromString,
+                )
+        self.GetTofCameraRosCompressedImage = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetTofCameraRosCompressedImage',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetTofCameraRosCompressedImageResponse.FromString,
+                )
+        self.GetRobotErrorCodeJson = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetRobotErrorCodeJson',
+                request_serializer=kachaka__api__pb2.EmptyRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetRobotErrorCodeJsonResponse.FromString,
+                )
+        self.GetError = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetError',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetErrorResponse.FromString,
+                )
         self.StartCommand = channel.unary_unary(
                 '/kachaka_api.KachakaApi/StartCommand',
                 request_serializer=kachaka__api__pb2.StartCommandRequest.SerializeToString,
@@ -90,6 +145,11 @@ class KachakaApiStub(object):
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetLastCommandResultResponse.FromString,
                 )
+        self.Proceed = channel.unary_unary(
+                '/kachaka_api.KachakaApi/Proceed',
+                request_serializer=kachaka__api__pb2.EmptyRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.ProceedResponse.FromString,
+                )
         self.GetLocations = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetLocations',
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
@@ -99,6 +159,16 @@ class KachakaApiStub(object):
                 '/kachaka_api.KachakaApi/GetShelves',
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetShelvesResponse.FromString,
+                )
+        self.GetMovingShelfId = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetMovingShelfId',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetMovingShelfIdResponse.FromString,
+                )
+        self.ResetShelfPose = channel.unary_unary(
+                '/kachaka_api.KachakaApi/ResetShelfPose',
+                request_serializer=kachaka__api__pb2.ResetShelfPoseRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.ResetShelfPoseResponse.FromString,
                 )
         self.SetAutoHomingEnabled = channel.unary_unary(
                 '/kachaka_api.KachakaApi/SetAutoHomingEnabled',
@@ -120,15 +190,90 @@ class KachakaApiStub(object):
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetManualControlEnabledResponse.FromString,
                 )
+        self.SetFrontTorchIntensity = channel.unary_unary(
+                '/kachaka_api.KachakaApi/SetFrontTorchIntensity',
+                request_serializer=kachaka__api__pb2.SetFrontTorchIntensityRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.SetFrontTorchIntensityResponse.FromString,
+                )
+        self.SetBackTorchIntensity = channel.unary_unary(
+                '/kachaka_api.KachakaApi/SetBackTorchIntensity',
+                request_serializer=kachaka__api__pb2.SetBackTorchIntensityRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.SetBackTorchIntensityResponse.FromString,
+                )
         self.SetRobotVelocity = channel.unary_unary(
                 '/kachaka_api.KachakaApi/SetRobotVelocity',
                 request_serializer=kachaka__api__pb2.SetRobotVelocityRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.SetRobotVelocityResponse.FromString,
                 )
+        self.ActivateLaserScan = channel.unary_unary(
+                '/kachaka_api.KachakaApi/ActivateLaserScan',
+                request_serializer=kachaka__api__pb2.ActivateLaserScanRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.ActivateLaserScanResponse.FromString,
+                )
+        self.GetMapList = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetMapList',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetMapListResponse.FromString,
+                )
+        self.GetCurrentMapId = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetCurrentMapId',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetCurrentMapIdResponse.FromString,
+                )
+        self.LoadMapPreview = channel.unary_unary(
+                '/kachaka_api.KachakaApi/LoadMapPreview',
+                request_serializer=kachaka__api__pb2.LoadMapPreviewRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.LoadMapPreviewResponse.FromString,
+                )
+        self.SwitchMap = channel.unary_unary(
+                '/kachaka_api.KachakaApi/SwitchMap',
+                request_serializer=kachaka__api__pb2.SwitchMapRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.SwitchMapResponse.FromString,
+                )
+        self.ExportMap = channel.unary_stream(
+                '/kachaka_api.KachakaApi/ExportMap',
+                request_serializer=kachaka__api__pb2.ExportMapRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.ExportMapResponse.FromString,
+                )
+        self.ImportMap = channel.stream_unary(
+                '/kachaka_api.KachakaApi/ImportMap',
+                request_serializer=kachaka__api__pb2.ImportMapRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.ImportMapResponse.FromString,
+                )
+        self.GetShortcuts = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetShortcuts',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetShortcutsResponse.FromString,
+                )
+        self.StartShortcutCommand = channel.unary_unary(
+                '/kachaka_api.KachakaApi/StartShortcutCommand',
+                request_serializer=kachaka__api__pb2.StartShortcutCommandRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.StartShortcutCommandResponse.FromString,
+                )
         self.GetHistoryList = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetHistoryList',
                 request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
                 response_deserializer=kachaka__api__pb2.GetHistoryListResponse.FromString,
+                )
+        self.GetSpeakerVolume = channel.unary_unary(
+                '/kachaka_api.KachakaApi/GetSpeakerVolume',
+                request_serializer=kachaka__api__pb2.GetRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.GetSpeakerVolumeResponse.FromString,
+                )
+        self.SetSpeakerVolume = channel.unary_unary(
+                '/kachaka_api.KachakaApi/SetSpeakerVolume',
+                request_serializer=kachaka__api__pb2.SetSpeakerVolumeRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.SetSpeakerVolumeResponse.FromString,
+                )
+        self.RestartRobot = channel.unary_unary(
+                '/kachaka_api.KachakaApi/RestartRobot',
+                request_serializer=kachaka__api__pb2.EmptyRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.RestartRobotResponse.FromString,
+                )
+        self.SetEmergencyStop = channel.unary_unary(
+                '/kachaka_api.KachakaApi/SetEmergencyStop',
+                request_serializer=kachaka__api__pb2.EmptyRequest.SerializeToString,
+                response_deserializer=kachaka__api__pb2.SetEmergencyStopResponse.FromString,
                 )
         self.GetStaticTransform = channel.unary_unary(
                 '/kachaka_api.KachakaApi/GetStaticTransform',
@@ -170,7 +315,19 @@ class KachakaApiServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetBatteryInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetObjectDetection(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetObjectDetectionFeatures(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -183,6 +340,12 @@ class KachakaApiServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetRosOdometry(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRosWheelOdometry(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -212,8 +375,57 @@ class KachakaApiServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def StartCommand(self, request, context):
+    def GetBackCameraRosCameraInfo(self, request, context):
         """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBackCameraRosImage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetBackCameraRosCompressedImage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTofCameraRosCameraInfo(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTofCameraRosImage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetTofCameraRosCompressedImage(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetRobotErrorCodeJson(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetError(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartCommand(self, request, context):
+        """Commands
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -236,20 +448,41 @@ class KachakaApiServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetLocations(self, request, context):
+    def Proceed(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetLocations(self, request, context):
+        """Locations
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetShelves(self, request, context):
+        """Shelves
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMovingShelfId(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ResetShelfPose(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def SetAutoHomingEnabled(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Auto homing
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -261,12 +494,25 @@ class KachakaApiServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def SetManualControlEnabled(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Teleop
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetManualControlEnabled(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetFrontTorchIntensity(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetBackTorchIntensity(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -278,14 +524,97 @@ class KachakaApiServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ActivateLaserScan(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetMapList(self, request, context):
+        """Map
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetCurrentMapId(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def LoadMapPreview(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SwitchMap(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ExportMap(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ImportMap(self, request_iterator, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetShortcuts(self, request, context):
+        """Shortcut
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def StartShortcutCommand(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def GetHistoryList(self, request, context):
+        """History
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetSpeakerVolume(self, request, context):
+        """Robot settings
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetSpeakerVolume(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RestartRobot(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def SetEmergencyStop(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetStaticTransform(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Transform
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -319,10 +648,20 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetPngMapResponse.SerializeToString,
             ),
+            'GetBatteryInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBatteryInfo,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetBatteryInfoResponse.SerializeToString,
+            ),
             'GetObjectDetection': grpc.unary_unary_rpc_method_handler(
                     servicer.GetObjectDetection,
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetObjectDetectionResponse.SerializeToString,
+            ),
+            'GetObjectDetectionFeatures': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetObjectDetectionFeatures,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetObjectDetectionFeaturesResponse.SerializeToString,
             ),
             'GetRosImu': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRosImu,
@@ -333,6 +672,11 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     servicer.GetRosOdometry,
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetRosOdometryResponse.SerializeToString,
+            ),
+            'GetRosWheelOdometry': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRosWheelOdometry,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetRosWheelOdometryResponse.SerializeToString,
             ),
             'GetRosLaserScan': grpc.unary_unary_rpc_method_handler(
                     servicer.GetRosLaserScan,
@@ -354,6 +698,46 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetFrontCameraRosCompressedImageResponse.SerializeToString,
             ),
+            'GetBackCameraRosCameraInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBackCameraRosCameraInfo,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetBackCameraRosCameraInfoResponse.SerializeToString,
+            ),
+            'GetBackCameraRosImage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBackCameraRosImage,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetBackCameraRosImageResponse.SerializeToString,
+            ),
+            'GetBackCameraRosCompressedImage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetBackCameraRosCompressedImage,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetBackCameraRosCompressedImageResponse.SerializeToString,
+            ),
+            'GetTofCameraRosCameraInfo': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTofCameraRosCameraInfo,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetTofCameraRosCameraInfoResponse.SerializeToString,
+            ),
+            'GetTofCameraRosImage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTofCameraRosImage,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetTofCameraRosImageResponse.SerializeToString,
+            ),
+            'GetTofCameraRosCompressedImage': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetTofCameraRosCompressedImage,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetTofCameraRosCompressedImageResponse.SerializeToString,
+            ),
+            'GetRobotErrorCodeJson': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetRobotErrorCodeJson,
+                    request_deserializer=kachaka__api__pb2.EmptyRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetRobotErrorCodeJsonResponse.SerializeToString,
+            ),
+            'GetError': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetError,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetErrorResponse.SerializeToString,
+            ),
             'StartCommand': grpc.unary_unary_rpc_method_handler(
                     servicer.StartCommand,
                     request_deserializer=kachaka__api__pb2.StartCommandRequest.FromString,
@@ -374,6 +758,11 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetLastCommandResultResponse.SerializeToString,
             ),
+            'Proceed': grpc.unary_unary_rpc_method_handler(
+                    servicer.Proceed,
+                    request_deserializer=kachaka__api__pb2.EmptyRequest.FromString,
+                    response_serializer=kachaka__api__pb2.ProceedResponse.SerializeToString,
+            ),
             'GetLocations': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLocations,
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
@@ -383,6 +772,16 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     servicer.GetShelves,
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetShelvesResponse.SerializeToString,
+            ),
+            'GetMovingShelfId': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMovingShelfId,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetMovingShelfIdResponse.SerializeToString,
+            ),
+            'ResetShelfPose': grpc.unary_unary_rpc_method_handler(
+                    servicer.ResetShelfPose,
+                    request_deserializer=kachaka__api__pb2.ResetShelfPoseRequest.FromString,
+                    response_serializer=kachaka__api__pb2.ResetShelfPoseResponse.SerializeToString,
             ),
             'SetAutoHomingEnabled': grpc.unary_unary_rpc_method_handler(
                     servicer.SetAutoHomingEnabled,
@@ -404,15 +803,90 @@ def add_KachakaApiServicer_to_server(servicer, server):
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetManualControlEnabledResponse.SerializeToString,
             ),
+            'SetFrontTorchIntensity': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetFrontTorchIntensity,
+                    request_deserializer=kachaka__api__pb2.SetFrontTorchIntensityRequest.FromString,
+                    response_serializer=kachaka__api__pb2.SetFrontTorchIntensityResponse.SerializeToString,
+            ),
+            'SetBackTorchIntensity': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetBackTorchIntensity,
+                    request_deserializer=kachaka__api__pb2.SetBackTorchIntensityRequest.FromString,
+                    response_serializer=kachaka__api__pb2.SetBackTorchIntensityResponse.SerializeToString,
+            ),
             'SetRobotVelocity': grpc.unary_unary_rpc_method_handler(
                     servicer.SetRobotVelocity,
                     request_deserializer=kachaka__api__pb2.SetRobotVelocityRequest.FromString,
                     response_serializer=kachaka__api__pb2.SetRobotVelocityResponse.SerializeToString,
             ),
+            'ActivateLaserScan': grpc.unary_unary_rpc_method_handler(
+                    servicer.ActivateLaserScan,
+                    request_deserializer=kachaka__api__pb2.ActivateLaserScanRequest.FromString,
+                    response_serializer=kachaka__api__pb2.ActivateLaserScanResponse.SerializeToString,
+            ),
+            'GetMapList': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetMapList,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetMapListResponse.SerializeToString,
+            ),
+            'GetCurrentMapId': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetCurrentMapId,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetCurrentMapIdResponse.SerializeToString,
+            ),
+            'LoadMapPreview': grpc.unary_unary_rpc_method_handler(
+                    servicer.LoadMapPreview,
+                    request_deserializer=kachaka__api__pb2.LoadMapPreviewRequest.FromString,
+                    response_serializer=kachaka__api__pb2.LoadMapPreviewResponse.SerializeToString,
+            ),
+            'SwitchMap': grpc.unary_unary_rpc_method_handler(
+                    servicer.SwitchMap,
+                    request_deserializer=kachaka__api__pb2.SwitchMapRequest.FromString,
+                    response_serializer=kachaka__api__pb2.SwitchMapResponse.SerializeToString,
+            ),
+            'ExportMap': grpc.unary_stream_rpc_method_handler(
+                    servicer.ExportMap,
+                    request_deserializer=kachaka__api__pb2.ExportMapRequest.FromString,
+                    response_serializer=kachaka__api__pb2.ExportMapResponse.SerializeToString,
+            ),
+            'ImportMap': grpc.stream_unary_rpc_method_handler(
+                    servicer.ImportMap,
+                    request_deserializer=kachaka__api__pb2.ImportMapRequest.FromString,
+                    response_serializer=kachaka__api__pb2.ImportMapResponse.SerializeToString,
+            ),
+            'GetShortcuts': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetShortcuts,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetShortcutsResponse.SerializeToString,
+            ),
+            'StartShortcutCommand': grpc.unary_unary_rpc_method_handler(
+                    servicer.StartShortcutCommand,
+                    request_deserializer=kachaka__api__pb2.StartShortcutCommandRequest.FromString,
+                    response_serializer=kachaka__api__pb2.StartShortcutCommandResponse.SerializeToString,
+            ),
             'GetHistoryList': grpc.unary_unary_rpc_method_handler(
                     servicer.GetHistoryList,
                     request_deserializer=kachaka__api__pb2.GetRequest.FromString,
                     response_serializer=kachaka__api__pb2.GetHistoryListResponse.SerializeToString,
+            ),
+            'GetSpeakerVolume': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetSpeakerVolume,
+                    request_deserializer=kachaka__api__pb2.GetRequest.FromString,
+                    response_serializer=kachaka__api__pb2.GetSpeakerVolumeResponse.SerializeToString,
+            ),
+            'SetSpeakerVolume': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetSpeakerVolume,
+                    request_deserializer=kachaka__api__pb2.SetSpeakerVolumeRequest.FromString,
+                    response_serializer=kachaka__api__pb2.SetSpeakerVolumeResponse.SerializeToString,
+            ),
+            'RestartRobot': grpc.unary_unary_rpc_method_handler(
+                    servicer.RestartRobot,
+                    request_deserializer=kachaka__api__pb2.EmptyRequest.FromString,
+                    response_serializer=kachaka__api__pb2.RestartRobotResponse.SerializeToString,
+            ),
+            'SetEmergencyStop': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetEmergencyStop,
+                    request_deserializer=kachaka__api__pb2.EmptyRequest.FromString,
+                    response_serializer=kachaka__api__pb2.SetEmergencyStopResponse.SerializeToString,
             ),
             'GetStaticTransform': grpc.unary_unary_rpc_method_handler(
                     servicer.GetStaticTransform,
@@ -504,6 +978,23 @@ class KachakaApi(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def GetBatteryInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetBatteryInfo',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetBatteryInfoResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def GetObjectDetection(request,
             target,
             options=(),
@@ -517,6 +1008,23 @@ class KachakaApi(object):
         return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetObjectDetection',
             kachaka__api__pb2.GetRequest.SerializeToString,
             kachaka__api__pb2.GetObjectDetectionResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetObjectDetectionFeatures(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetObjectDetectionFeatures',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetObjectDetectionFeaturesResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -551,6 +1059,23 @@ class KachakaApi(object):
         return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetRosOdometry',
             kachaka__api__pb2.GetRequest.SerializeToString,
             kachaka__api__pb2.GetRosOdometryResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetRosWheelOdometry(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetRosWheelOdometry',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetRosWheelOdometryResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -623,6 +1148,142 @@ class KachakaApi(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def GetBackCameraRosCameraInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetBackCameraRosCameraInfo',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetBackCameraRosCameraInfoResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetBackCameraRosImage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetBackCameraRosImage',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetBackCameraRosImageResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetBackCameraRosCompressedImage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetBackCameraRosCompressedImage',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetBackCameraRosCompressedImageResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetTofCameraRosCameraInfo(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetTofCameraRosCameraInfo',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetTofCameraRosCameraInfoResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetTofCameraRosImage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetTofCameraRosImage',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetTofCameraRosImageResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetTofCameraRosCompressedImage(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetTofCameraRosCompressedImage',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetTofCameraRosCompressedImageResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetRobotErrorCodeJson(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetRobotErrorCodeJson',
+            kachaka__api__pb2.EmptyRequest.SerializeToString,
+            kachaka__api__pb2.GetRobotErrorCodeJsonResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetError(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetError',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetErrorResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def StartCommand(request,
             target,
             options=(),
@@ -691,6 +1352,23 @@ class KachakaApi(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def Proceed(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/Proceed',
+            kachaka__api__pb2.EmptyRequest.SerializeToString,
+            kachaka__api__pb2.ProceedResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def GetLocations(request,
             target,
             options=(),
@@ -721,6 +1399,40 @@ class KachakaApi(object):
         return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetShelves',
             kachaka__api__pb2.GetRequest.SerializeToString,
             kachaka__api__pb2.GetShelvesResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetMovingShelfId(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetMovingShelfId',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetMovingShelfIdResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ResetShelfPose(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/ResetShelfPose',
+            kachaka__api__pb2.ResetShelfPoseRequest.SerializeToString,
+            kachaka__api__pb2.ResetShelfPoseResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -793,6 +1505,40 @@ class KachakaApi(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def SetFrontTorchIntensity(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/SetFrontTorchIntensity',
+            kachaka__api__pb2.SetFrontTorchIntensityRequest.SerializeToString,
+            kachaka__api__pb2.SetFrontTorchIntensityResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetBackTorchIntensity(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/SetBackTorchIntensity',
+            kachaka__api__pb2.SetBackTorchIntensityRequest.SerializeToString,
+            kachaka__api__pb2.SetBackTorchIntensityResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def SetRobotVelocity(request,
             target,
             options=(),
@@ -810,6 +1556,159 @@ class KachakaApi(object):
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
+    def ActivateLaserScan(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/ActivateLaserScan',
+            kachaka__api__pb2.ActivateLaserScanRequest.SerializeToString,
+            kachaka__api__pb2.ActivateLaserScanResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetMapList(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetMapList',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetMapListResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetCurrentMapId(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetCurrentMapId',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetCurrentMapIdResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def LoadMapPreview(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/LoadMapPreview',
+            kachaka__api__pb2.LoadMapPreviewRequest.SerializeToString,
+            kachaka__api__pb2.LoadMapPreviewResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SwitchMap(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/SwitchMap',
+            kachaka__api__pb2.SwitchMapRequest.SerializeToString,
+            kachaka__api__pb2.SwitchMapResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ExportMap(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/kachaka_api.KachakaApi/ExportMap',
+            kachaka__api__pb2.ExportMapRequest.SerializeToString,
+            kachaka__api__pb2.ExportMapResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ImportMap(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_unary(request_iterator, target, '/kachaka_api.KachakaApi/ImportMap',
+            kachaka__api__pb2.ImportMapRequest.SerializeToString,
+            kachaka__api__pb2.ImportMapResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetShortcuts(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetShortcuts',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetShortcutsResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def StartShortcutCommand(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/StartShortcutCommand',
+            kachaka__api__pb2.StartShortcutCommandRequest.SerializeToString,
+            kachaka__api__pb2.StartShortcutCommandResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
     def GetHistoryList(request,
             target,
             options=(),
@@ -823,6 +1722,74 @@ class KachakaApi(object):
         return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetHistoryList',
             kachaka__api__pb2.GetRequest.SerializeToString,
             kachaka__api__pb2.GetHistoryListResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetSpeakerVolume(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/GetSpeakerVolume',
+            kachaka__api__pb2.GetRequest.SerializeToString,
+            kachaka__api__pb2.GetSpeakerVolumeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetSpeakerVolume(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/SetSpeakerVolume',
+            kachaka__api__pb2.SetSpeakerVolumeRequest.SerializeToString,
+            kachaka__api__pb2.SetSpeakerVolumeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RestartRobot(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/RestartRobot',
+            kachaka__api__pb2.EmptyRequest.SerializeToString,
+            kachaka__api__pb2.RestartRobotResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetEmergencyStop(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/kachaka_api.KachakaApi/SetEmergencyStop',
+            kachaka__api__pb2.EmptyRequest.SerializeToString,
+            kachaka__api__pb2.SetEmergencyStopResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
