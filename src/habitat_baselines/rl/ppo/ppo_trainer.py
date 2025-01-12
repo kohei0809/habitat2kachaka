@@ -18,6 +18,7 @@ from sentence_transformers import util
 import numpy as np
 import torch
 import tqdm
+import datetime
 
 from habitat import Config
 from habitat.core.logging import logger
@@ -45,6 +46,7 @@ from llava.utils import disable_torch_init
 from llava.mm_utils import tokenizer_image_token, get_model_name_from_path
 from transformers import TextStreamer
 
+from segment_anything import SamAutomaticMaskGenerator, sam_model_registry
 
 
 def to_grid(client, realworld_x, realworld_y):
@@ -113,6 +115,10 @@ class PPOTrainerO(BaseRLTrainerOracle):
         
         align_to = rs.stream.color
         self.align = rs.align(align_to)
+        
+        self.MODEL_TYPE = "vit_b"
+        self.MODEL_PATH = "sam_model/sam_vit_b.pth"
+        self.sam = None
 
 
     def _setup_actor_critic_agent(self, ppo_cfg: Config) -> None:
@@ -230,12 +236,49 @@ class PPOTrainerO(BaseRLTrainerOracle):
         total_sim = np.sum(sim_list)
         total_sim /= (len(picture_list)*(len(picture_list)-1))
         return total_sim
+    
+    def _count_category(self, taken_picture_list):
+        if self.sam is None:
+            self.sam = sam_model_registry[self.MODEL_TYPE](checkpoint=self.MODEL_PATH)
+            self.sam.to(device=self.device)
+        
+        mask_generator = SamAutomaticMaskGenerator(
+            self.sam,
+            min_mask_region_area=1000,  # 小さな領域を除外
+            stability_score_thresh=0.9, # 不安定なマスクを除外
+            pred_iou_thresh=0.9,        # 高精度なマスクのみ保持
+        )   
+        
+        for i in range(len(taken_picture_list)):
+            pic_val = taken_picture_list[i][0]
+            image = taken_picture_list[i][1]
+            #print(f"image={image.shape}")
+            
+            masks = mask_generator.generate(np.array(image))
+            
+            sorted_anns = sorted(masks, key=(lambda x: x['area']), reverse=True)
+            
+            image_size = image.shape[0] * image.shape[1]
+            category_count = 0
+            for ann in sorted_anns:
+                area = ann['area']
+                if area < image_size * 0.01:
+                    break
+                
+                category_count += 1
+                
+            taken_picture_list[i][4] = pic_val * category_count
+            return taken_picture_list
+            
             
     def _select_pictures(self, taken_picture_list):
+        # Segment Anythingで物体数をpi_valにかける
+        taken_picture_list = self._count_category(taken_picture_list)
+        
         results = []
         res_val = 0.0
 
-        sorted_picture_list = sorted(taken_picture_list, key=lambda x: x[0], reverse=True)
+        sorted_picture_list = sorted(taken_picture_list, key=lambda x: x[4], reverse=True)
         i = 0
         while True:
             if len(results) == self._num_picture:
@@ -247,7 +290,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
             if is_save == True:
                 results.append(sorted_picture_list[i])
-                res_val += sorted_picture_list[i][0]
+                res_val += sorted_picture_list[i][4]
             i += 1
 
         result_len = max(len(results), 1)
@@ -331,6 +374,34 @@ class PPOTrainerO(BaseRLTrainerOracle):
         final_image.paste(explored_picture, (result_width, 0))
 
         return final_image, x_list, y_list
+    
+    def _create_results_image2(self, picture_list):
+        images = []
+    
+        if len(picture_list) == 0:
+            return None
+
+        for i in range(self._num_picture):
+            idx = i%len(picture_list)
+            images.append(Image.fromarray(picture_list[idx][1]))
+
+        width, height = images[0].size
+        result_width = width * 5
+        result_height = height * 2
+        result_image = Image.new("RGB", (result_width, result_height))
+
+        for i, image in enumerate(images):
+            x_offset = (i % 5) * width
+            y_offset = (i // 5) * height
+            result_image.paste(image, (x_offset, y_offset))
+        
+        draw = ImageDraw.Draw(result_image)
+        for x in range(width, result_width, width):
+            draw.line([(x, 0), (x, result_height)], fill="black", width=7)
+        for y in range(height, result_height, height):
+            draw.line([(0, y), (result_width, y)], fill="black", width=7)
+
+        return result_image
 
 
     def create_description_from_results_image(self, results_image):
@@ -393,13 +464,12 @@ class PPOTrainerO(BaseRLTrainerOracle):
         return outputs
     """
     
-    
     def get_explored_picture(self, explored, top_down_map):
         explored_map = explored["map"]
         fog_of_war_map = top_down_map["fog_not_clip"]
         start_position = explored["start_position"]
         y, x = explored_map.shape
-        print(f"EXPLORED={explored_map.shape}, FOG={fog_of_war_map.shape}")
+        #print(f"EXPLORED={explored_map.shape}, FOG={fog_of_war_map.shape}")
 
         for i in range(y):
             for j in range(x):
@@ -427,7 +497,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
         return explored_map, start_position
 
 
-    def _exec_kachaka(self, date, ip) -> None:
+    def _exec_kachaka(self, date, ip, ckpt) -> None:
         max_step = 500
         #self.cap = cv2.VideoCapture(0)
         #_, frame = self.cap.read()
@@ -464,8 +534,8 @@ class PPOTrainerO(BaseRLTrainerOracle):
         # カチャカにshelfをstartに連れていく
         print("Get the shelf and Go to the Start")
         #sclient.move_shelf("S01", "L01")
-        client.move_shelf("S01", "start")
-        #client.move_shelf("S01", "start2")
+        #client.move_shelf("S01", "start")
+        client.move_shelf("S02", "start2")
         client.set_auto_homing_enabled(False)
         
         self.device = (
@@ -482,7 +552,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
             
         # evaluate multiple checkpoints in order
         #checkpoint_index = 50
-        checkpoint_index = 120
+        checkpoint_index = ckpt
         print("checkpoint_index=" + str(checkpoint_index))
         while True:
             checkpoint_path = None
@@ -564,8 +634,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
             not_done_masks = torch.zeros(
                 self.config.NUM_PROCESSES, 1, device=self.device
             )
-            stats_episodes = dict()  # dict of dicts that stores stats per episode
-            raw_metrics_episodes = dict()
 
             rgb_frames = [[]]  # type: List[List[np.ndarray]]
             if len(self.config.VIDEO_OPTION) > 0:
@@ -591,6 +659,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         action,
                         _,
                         test_recurrent_hidden_states,
+                        distribution,
                     ) = self.actor_critic.act(
                         batch,
                         test_recurrent_hidden_states,
@@ -601,7 +670,24 @@ class PPOTrainerO(BaseRLTrainerOracle):
 
                     prev_actions.copy_(action)
 
+                #print(f"distribution={distribution}")
+                #print(f"action={action}")
+                action_type = observations["action_type"]    
+                action_mask = torch.tensor(action_type)
+                if torch.equal(action_mask, torch.tensor([0, 0, 0])):
+                    action[0] = torch.tensor(-1)
+                elif torch.equal(action_mask, torch.tensor([1, 1, 1])) == False:
+                    print(f"###### action_type = {action_type} ######")
+                    if action_mask[action[0].item()] == 0:
+                        print(f"action={action[0]}")
+                        distribution *= action_mask
+                        distribution = distribution / distribution.sum()
+                        action = torch.multinomial(distribution, 1)
+                        print(f"change_action={action[0]}")
+                        prev_actions.copy_(action)
+                
                 outputs = self.env.step(action[0].item())
+                #outputs = self.env.step(0)
     
                 observations, rewards, done, infos = outputs
                 observations, is_success = observations
@@ -631,7 +717,7 @@ class PPOTrainerO(BaseRLTrainerOracle):
                 similarity.append(0)
                 pic_sim.append(0)
                 
-                self._taken_picture_list[0].append([pic_val[0], observations["rgb"], rewards[6], rewards[7]])
+                self._taken_picture_list[0].append([pic_val[0], observations["rgb"], rewards[6], rewards[7], 0.0])
 
                 reward = torch.tensor(reward, dtype=torch.float, device=self.device).unsqueeze(1)
                 exp_area = torch.tensor(exp_area, dtype=torch.float, device=self.device).unsqueeze(1)
@@ -660,10 +746,11 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     explored_picture = Image.fromarray(np.uint8(explored_picture))
                     
                     #写真の選別
-                    self._taken_picture_list[0], picture_value[0] = self._select_pictures(self._taken_picture_list[0])
-                    results_image, positions_x, positions_y = self._create_results_image(self._taken_picture_list[0], explored_picture)
+                    save_picture_list, picture_value[0] = self._select_pictures(self._taken_picture_list[0])
+                    #results_image, positions_x, positions_y = self._create_results_image(save_picture_list, explored_picture)
+                    results_image = self._create_results_image2(save_picture_list)
                     
-                    pic_sim[0] = self._calculate_pic_sim(self._taken_picture_list[0])
+                    pic_sim[0] = self._calculate_pic_sim(save_picture_list)
                     reward[0] += similarity[0]*10
  
                     # average of picture value par 1 picture
@@ -679,11 +766,13 @@ class PPOTrainerO(BaseRLTrainerOracle):
                         print(pred_description,file=f)
                     """
                     
+                    """
                     # save picture position
                     position_path = os.path.join("position.txt")
                     with open(position_path, 'a') as f:
                         for i in range(len(positions_x)):
                             print(str(self.step) + "-" + str(i) + "," + str(start_position) + "," + str(positions_x[i]) + "," + str(positions_y[i]), file=f)
+                    """
                             
                     pbar.update()
                     episode_stats = dict()
@@ -695,17 +784,6 @@ class PPOTrainerO(BaseRLTrainerOracle):
                     episode_stats.update(
                         self._extract_scalars_from_info(infos)
                     )
-                    
-                    # use scene_id + episode_id as unique id for storing stats
-                    stats_episodes[
-                        (
-                            "aaa", "aaa"
-                        )
-                    ] = episode_stats
-                                
-                    raw_metrics_episodes[
-                        "aaa.aaa"
-                    ] = infos["raw_metrics"]
 
                     if len(self.config.VIDEO_OPTION) > 0:
                         if len(rgb_frames[0]) == 0:
@@ -727,20 +805,22 @@ class PPOTrainerO(BaseRLTrainerOracle):
                             name_ci=name_sim,
                         )
                         client.speak("途中経過のビデオを作成しました。")
+                        now_time = datetime.datetime.now().strftime('%H-%M-%S') 
+                        print(f"Now Time is {now_time}")
                         
                         # Save taken picture                     
-                        for j in range(len(self._taken_picture_list[0])):
-                            value = self._taken_picture_list[0][j][0]
-                            picture_name = f"episode=aaa-{len(stats_episodes)}-{j}-{self.step}-{value}"
+                        for j in range(len(save_picture_list)):
+                            value = save_picture_list[0][j][4]
+                            picture_name = f"{self.step}-{j}-{value}"
                             dir_name = "./taken_picture/" + date 
                             os.makedirs(dir_name, exist_ok=True)
                                 
-                            picture = Image.fromarray(np.uint8(self._taken_picture_list[0][j][1]))
+                            picture = Image.fromarray(np.uint8(save_picture_list[0][j][1]))
                             file_path = dir_name + "/" + picture_name + ".png"
                             picture.save(file_path)
                             
                         if results_image is not None:
-                            results_image.save(f"./taken_picture/{date}/episoede=aaa-{self.step}.png")    
+                            results_image.save(f"./taken_picture/{date}/{self.step}.png")    
             
             client.speak("エピソードが終了しました。")
                     

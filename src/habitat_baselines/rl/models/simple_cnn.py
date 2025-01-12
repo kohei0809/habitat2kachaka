@@ -17,6 +17,8 @@ class RGBCNNOracle(nn.Module):
 
     def __init__(self, observation_space, output_size):
         super().__init__()
+        #print(f"obs_space_type={type(observation_space)}")
+        #print(f"obs_space={observation_space}")
         if "rgb" in observation_space.spaces:
             self._n_input_rgb = observation_space.spaces["rgb"].shape[2]
         else:

@@ -9,6 +9,22 @@ import kachaka_api
 from utils import move
 sys.path.append(f"/Users/{os.environ['USER']}/Desktop/habitat2kachaka/kachaka-api/python/")
 
+def cal_distance(pre_location, now_location):
+    pre_x = pre_location.x
+    pre_y = pre_location.y
+    pre_theta = pre_location.theta
+    now_x = now_location.x
+    now_y = now_location.y
+    now_theta = now_location.theta
+    
+    dif_x = now_x - pre_x
+    dif_y = now_y - pre_y
+    dif_theta = now_theta - pre_theta
+    distance = math.sqrt(dif_x*dif_x + dif_y*dif_y)
+    dif_theta_deg = math.degrees(dif_theta)
+    
+    print(f"distance={distance}, theta={dif_theta_deg}")
+
 
 if __name__ == "__main__":
     ip = "192.168.100.35:26400"
@@ -16,67 +32,97 @@ if __name__ == "__main__":
     client.update_resolver()
     #print(client.get_locations())
     
-    client.move_shelf("S01", "start")
-    
-    client.set_auto_homing_enabled(False)
+    pos_num = 1
     # startに移動する
-    client.move_forward(0.5)
-    time.sleep(2)
+    client.move_shelf("S01", "start")
+    client.set_auto_homing_enabled(False)
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    location = client.get_robot_pose()
+    print(location)
     
-    """
-    print("########## pose 1 ############")
-    location1 = client.get_robot_pose()
-    print(location1)
-    x_1 = location1.x
-    y_1 = location1.y
-    theta_1_rad = location1.theta
-    theta_1_deg = math.degrees(theta_1_rad)
-        
-    x = 0.25 * math.cos(theta_1_rad)
-    y =  0.25 * math.sin(theta_1_rad)   
-    print("X: "+ str(x) + ", Y: " + str(y))
-    move(client, x_1+x, y_1+y, theta_1_rad)
-    
-    time.sleep(2)
-    location2 = client.get_robot_pose()
-    print("########## pose 2 ############")
-    print(location2)
-    x_2 = location2.x
-    y_2 = location2.y
-    theta_2_rad = location2.theta
-    theta_2_deg = math.degrees(theta_2_rad)
-    
-    diff_meter = np.sqrt((x_2-x_1)*(x_2-x_1) + (y_2-y_1)*(y_2-y_1))
-    
-    diff_rad = theta_2_rad - theta_1_rad
-    diff_deg = theta_2_deg - theta_1_deg
-    
-    print("DIFF_X: " + str(x_2-x_1) + ", DIFF_Y: " + str(y_2-y_1))
-    print("DIFF_METER: " + str(diff_meter) + " [m]")
-    print("DIFF_rad: " + str(diff_rad) + " [rad]")
-    print("DIFF_DEG: " + str(diff_deg) + " [度]")
-    
+    client.move_forward(0.25)
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
     time.sleep(1)
     
-    angle = math.radians(30)
-    move(client, x_2, y_2, theta_2_rad+angle)
-
-    time.sleep(2)
+    client.move_forward(0.25)
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
     
-    location3 = client.get_robot_pose()
-    print("########## pose 3 ############")
-    print(location3)
-    x_3 = location3.x
-    y_3 = location3.y
-    theta_3_rad = location3.theta
-    theta_3_deg = math.degrees(theta_3_rad)
+    theta_rad = -math.pi/6
+    client.rotate_in_place(theta_rad) 
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
     
+    client.move_forward(0.25)
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
     
-    diff_rad = theta_3_rad - theta_2_rad
-    diff_deg = theta_3_deg - theta_2_deg
+    theta_rad = math.pi/6
+    client.rotate_in_place(theta_rad) 
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
     
-    print("DIFF_METER: " + str(diff_meter) + " [m]")
-    print("DIFF_rad: " + str(diff_rad) + " [rad]")
-    print("DIFF_DEG: " + str(diff_deg) + " [度]")
-    """
+    client.move_forward(0.25)
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
+    
+    theta_rad = math.pi/6
+    client.rotate_in_place(theta_rad) 
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
+    
+    theta_rad = math.pi/6
+    client.rotate_in_place(theta_rad) 
+    time.sleep(1)
+    print(f"########## pose {pos_num} ############")
+    pos_num += 1
+    pre_location = location
+    location = client.get_robot_pose()
+    print(location)
+    cal_distance(pre_location, location)
+    time.sleep(1)
     

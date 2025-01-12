@@ -30,6 +30,10 @@ def main():
         datadate = "24-05-16 16-06-47"
         #datadate = "24-06-30 03-48-07"
         datadate = "24-07-25 06-34-14"
+        datadate = "24-08-11 21-55-35"
+        
+        ckpt = 120
+        ckpt = 165
 
     config = get_config(exp_config)
     
@@ -77,10 +81,13 @@ def main():
     print("-----------------------------------")
     print("device:" + str(device))
     print("-----------------------------------")
+    
+    start_time = datetime.datetime.now().strftime('%H-%M-%S') 
+    print(f"Start at {start_time}")
 
     
-    ip = "192.168.100.35:26400"
-    trainer._exec_kachaka(start_date, ip)
+    ip = "192.168.100.6:26400"
+    trainer._exec_kachaka(start_date, ip, ckpt)
     #trainer._exec_kachaka(log_manager, start_date, ip)
        
     end_date = datetime.datetime.now().strftime('%y-%m-%d %H-%M-%S') 

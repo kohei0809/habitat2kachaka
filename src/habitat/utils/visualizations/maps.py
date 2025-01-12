@@ -12,6 +12,7 @@ import imageio
 import numpy as np
 import scipy.ndimage
 import io
+import math
 
 from habitat.core.simulator import Simulator
 from habitat.core.utils import try_cv2_import
@@ -207,12 +208,53 @@ def recreate_map(map_data):
             if (i == 175) and (map_data[i][j] == 1):
                 map_data[i][j] = 2
             # 机 
-            if (i >= 70) and (i <= 153) and(j >= 59) and (j <= 81):
+            if (i > 67) and (i < 156) and (j > 57) and (j < 84):
                 map_data[i][j] = 0
+            if (i == 67) and (j >= 57) and (j <= 84):
+                map_data[i][j] = 2
+            if (i == 156) and (j >= 57) and (j <= 84):
+                map_data[i][j] = 2
+            if (i >= 67) and (i <= 156) and (j == 57):
+                map_data[i][j] = 2
+            if (i >= 67) and (i <= 156) and (j == 84):
+                map_data[i][j] = 2
+            
             if i <= 56:
                 map_data[i][j] = 0
             if (i == 57) and (map_data[i][j] == 1):
                 map_data[i][j] = 2
+                
+            if (i >= 120) and (i <= 130) and (j == 52):
+                map_data[i][j] = 1
+                
+            # ゴミ箱
+            if (i >= 127) and (i <= 142) and (j >= 38) and (j <= 49):
+                map_data[i][j] = 0
+            if (i == 143) and (j >= 38) and (j <= 49):
+                map_data[i][j] = 2
+            if (i >= 127) and (i <= 142) and (j == 50):
+                map_data[i][j] = 2
+                
+            # ソファ
+            if (i > 124) and (i < 157) and (j > 90):
+                map_data[i][j] = 0
+            if (i == 125) and (j >= 91) and (j <= 102):
+                map_data[i][j] = 2
+            if (i == 156) and (j >= 91) and (j <= 115):
+                map_data[i][j] = 2
+            if (j == 91) and (i >= 125) and (i <= 156):
+                map_data[i][j] = 2
+                
+            if (i >= 158) and (i <= 162) and (j >= 46) and (j <= 52):
+                map_data[i][j] = 1
+                
+            if (j >= 115) and (map_data[i][j] != 0):
+                map_data[i][j] = 0
+            if (j == 115) and (map_data[i][j-1] == 1):
+                map_data[i][j] = 2
+                
+            if (i >= 161) and (i < 175) and (j >= 41) and (j < 115):
+                map_data[i][j] = 1
     
     # 境界線をちゃんと作る
     for i in range(map_data.shape[0]):
@@ -231,6 +273,28 @@ def recreate_map(map_data):
                             map_data[i][j] = 2
                             flag = True
                             break
+                        
+    # 境界線を太らせる
+    """
+    pre_map_data = np.copy(map_data)
+    for i in range(map_data.shape[0]):
+        for j in range(map_data.shape[1]):
+            if map_data[i][j] != 1:
+                continue
+            flag = False
+            for k in range(-3, 4):
+                if ((i+k) < 0) or ((i+k) >= map_data.shape[0]):
+                    continue
+                if flag == True:
+                    break
+                for l in range(-3, 4):
+                    if ((j+l) < 0) or ((j+l) >= map_data.shape[1]):
+                        continue
+                    if pre_map_data[i+k][j+l] == 2:
+                        map_data[i][j] = 2
+                        flag = True
+                        break
+    """
 
     map_manager = LogManager()
     map_manager.setLogDirectory("Map")
@@ -242,7 +306,6 @@ def recreate_map(map_data):
         map_logger.writeLine()
         
     print("Create Map Logger")
-
                        
     return map_data
     
@@ -279,7 +342,6 @@ def create_map(map_data):
 
 def get_topdown_map(
     sim: Simulator,
-    map_resolution: Tuple[int, int] = (1250, 1250),
     client = None
 ) -> np.ndarray:
     r"""Return a top-down occupancy map for a sim. Note, this only returns valid
@@ -287,13 +349,7 @@ def get_topdown_map(
 
     Args:
         sim: The simulator.
-        map_resolution: The resolution of map which will be computed and
-            returned.
-        num_samples: The number of random navigable points which will be
-            initially
-            sampled. For large environments it may need to be increased.
-        draw_border: Whether to outline the border of the occupied spaces.
-
+        
     Returns:
         Image containing 0 if occupied, 1 if unoccupied, and 2 if border (if
         the flag is set).
@@ -322,7 +378,6 @@ def get_topdown_map(
 
 def get_sem_map(
     sim: Simulator,
-    map_resolution: Tuple[int, int] = (1250, 1250),
     client = None
 ) -> np.ndarray:
     map = client.get_png_map()

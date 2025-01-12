@@ -283,6 +283,7 @@ class EmbodiedTask:
 
     def reset(self):
         self.currGoalIndex=0
+        self._is_episode_active = True
         
         observations = self._sim.reset()
         observations.update(

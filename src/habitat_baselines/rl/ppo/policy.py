@@ -43,7 +43,7 @@ class PolicyOracle(nn.Module):
 
         action_log_probs = distribution.log_probs(action)
 
-        return value, action, action_log_probs, rnn_hidden_states
+        return value, action, action_log_probs, rnn_hidden_states, distribution.probs
 
     def get_value(self, observations, rnn_hidden_states, prev_actions, masks):
         features, _ = self.net(

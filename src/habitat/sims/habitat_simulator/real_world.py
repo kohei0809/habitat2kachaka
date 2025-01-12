@@ -207,6 +207,89 @@ class RealDepthSensor(Sensor):
           
         obs = obs.astype(np.float64)
         return obs
+    
+class RealSensor(Sensor):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        config = kwargs["config"]
+
+        if config.NORMALIZE_DEPTH:
+            self.min_depth_value = 0
+            self.max_depth_value = 1
+        else:
+            self.min_depth_value = config.MIN_DEPTH
+            self.max_depth_value = config.MAX_DEPTH
+              
+        # ストリームの設定
+        realsense_config = rs.config()
+        realsense_config.enable_stream(rs.stream.color, 424, 240, rs.format.bgr8, 30)
+        realsense_config.enable_stream(rs.stream.depth, 424, 240, rs.format.z16, 30)
+        
+        # ストリーミング開始
+        self.pipeline = rs.pipeline()
+        self.pipeline.start(realsense_config)
+        align_to = rs.stream.color
+        self.align = rs.align(align_to)
+        
+        self.pre_frames = None
+        #self.cap = cv2.VideoCapture(0)
+        
+        super().__init__(*args, **kwargs)
+        
+    def __exit__(self):
+        cv2.destroyAllWindows()
+
+    def _get_uuid(self, *args: Any, **kwargs: Any):
+        return "real"
+
+    def _get_sensor_type(self, *args: Any, **kwargs: Any) -> SensorTypes:
+        return SensorTypes.COLOR
+
+    def _get_observation_space(self, *args: Any, **kwargs: Any) -> Space:
+        return spaces.Box(
+            low=0,
+            high=np.iinfo(np.int64).max,
+            shape=(self.config.HEIGHT, self.config.WIDTH, RGBSENSOR_DIMENSION),
+            dtype=np.uint8,
+        )
+
+    def get_observation(self) -> Any:
+
+        while True:
+            try:
+                frames = self.pipeline.wait_for_frames()
+                break
+            except:
+                print("rgb")
+                ctx = rs.context()
+                devices = ctx.query_devices()
+                for dev in devices:
+                    dev.hardware_reset()
+                    print(dev)
+                print("reset done")
+            
+        self.pre_frames = frames
+        frames = self.align.process(frames)    
+        # RGB
+        color_frame = frames.get_color_frame()
+        color_image = np.asanyarray(color_frame.get_data())
+        color_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+        
+        # 深度
+        depth_frame = frames.get_depth_frame()
+        depth_image = np.asanyarray(depth_frame.get_data())     
+        depth_image = depth_image/1000
+        
+        size = self.observation_space.shape
+        
+        rgb_obs = cv2.resize(color_image, size[0:2])
+        rgb_obs = rgb_obs.astype(np.uint8)
+        
+        depth_obs = cv2.resize(depth_image, size[0:2])
+        depth_obs = depth_obs[:,:,np.newaxis]
+        depth_obs = depth_obs.astype(np.float64)
+        
+        obs = {"rgb": rgb_obs, "depth": depth_obs}
+        return obs
 
 @registry.register_simulator(name="Real-v0")
 class RealWorld(Simulator):
@@ -218,11 +301,14 @@ class RealWorld(Simulator):
 
         sim_sensors = []
         
-        print(config)
+        #print(config)
+        
         if "RGB_SENSOR" in config.AGENT_0.SENSORS:
             sim_sensors.append(RealRGBSensor(config=self.config.RGB_SENSOR))
         if "DEPTH_SENSOR" in config.AGENT_0.SENSORS:
             sim_sensors.append(RealDepthSensor(config=self.config.DEPTH_SENSOR))
+
+        #sim_sensors.append(RealSensor(config=self.config.DEPTH_SENSOR))
 
         self._sensor_suite = SensorSuite(sim_sensors)
         
@@ -278,12 +364,20 @@ class RealWorld(Simulator):
         return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
     
     def get_agent_state2(self):
+        """
         if self.is_reset_postion == False:
             pos = self._client.get_robot_pose()
             self.x = pos.x
             self.y = pos.y
             self.z = 0.0
             self.theta_rad = pos.theta
+        """    
+
+        pos = self._client.get_robot_pose()
+        self.x = pos.x
+        self.y = pos.y
+        self.z = 0.0
+        self.theta_rad = pos.theta
         
         return {"position":[self.x, self.z, self.y], "rotation": self.theta_rad}
 
@@ -298,6 +392,9 @@ class RealWorld(Simulator):
     
     def get_observations_at(self) -> Optional[Observations]:
         observations = self._sensor_suite.get_observations()
+        #print(f"type={type(observations)}")
+        #print(f"len={len(observations)}")
+        #print(f"obs={observations}")
         return observations
     
     def reset_position(self) -> None:

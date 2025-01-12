@@ -6,6 +6,7 @@
 
 import io
 import time
+import math
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, Union
 import pickle
 import torch
@@ -28,7 +29,7 @@ from habitat.tasks import make_task
 from habitat.tasks.nav.maximum_info_task import MaximumInformationTask
 from habitat_baselines.common.utils import quat_from_angle_axis
 from habitat.sims.habitat_simulator.real_world import RealWorld
-from habitat.utils.visualizations.maps import get_sem_map
+from habitat.utils.visualizations.maps import get_sem_map, get_topdown_map, to_grid
 
 import matplotlib.pyplot as plt
 
@@ -284,6 +285,9 @@ class Env:
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             robot_pose = self.client.get_robot_pose()
             currPix = self.conv_grid(robot_pose.x, robot_pose.y)  ## Explored area marking
+            
+            self.action_type_map, _, _, _, _ = get_topdown_map(sim=self.sim, client=self.client)
+            observations["action_type"] = self.get_action_type(sim=self.sim, client=self.client)
 
             self.expose = self.task.measurements.measures["fow_map"].get_metric()
                 
@@ -318,6 +322,52 @@ class Env:
         self._episode_over = not self._task.is_episode_active
         if self._past_limit():
             self._episode_over = True
+            
+    def get_action_type(self, sim: Simulator, client = None, meter = 0.25, turn = 30) -> np.ndarray:
+        state = sim.get_agent_state2()
+        x = state["position"][0]
+        y = state["position"][2]
+        grid_x, grid_y = to_grid(client, x, y)
+        theta_rad = state["rotation"]
+        turn_rad = math.radians(turn)
+        #print(f"X={grid_x}, Y={grid_y}")
+        
+        delta_x = meter * math.cos(theta_rad)
+        delta_y = meter * math.sin(theta_rad)  
+        theta_deg = math.degrees(theta_rad)
+        move_x, move_y = to_grid(client, x+delta_x, y+delta_y)
+
+        delta_lx = meter * math.cos(theta_rad+turn_rad)
+        delta_ly = meter * math.sin(theta_rad+turn_rad)
+        left_x, left_y = to_grid(client, x+delta_lx, y+delta_ly)
+        
+        delta_rx = meter * math.cos(theta_rad-turn_rad)
+        delta_ry = meter * math.sin(theta_rad-turn_rad)
+        right_x, right_y = to_grid(client, x+delta_rx, y+delta_ry)
+        
+        #print(f"IF FORWARD: X={move_x}, Y={move_y}")
+        
+        #now_type = self.action_type_map[grid_y, grid_x]
+        forward_type = self.action_type_map[move_y, move_x]
+        left_type = self.action_type_map[left_y, left_x]
+        right_type = self.action_type_map[right_y, right_x]
+        
+        # 動ける：1, 動けない：0
+        # 全て動ける：111
+        # 前だけ動けない：011
+        action_type = [0, 0, 0]
+        if forward_type == 1:
+            action_type[0] = 1
+        if left_type == 1:
+            action_type[1] = 1
+        if right_type == 1:
+            action_type[2] = 1
+        
+        #print(f"now_type={now_type}")  
+        print(f"action_type={action_type}")
+        
+        return action_type
+
 
     def step(
         self, action: Union[int, str, Dict[str, Any]], **kwargs
@@ -330,11 +380,21 @@ class Env:
             self._episode_over is False
         ), "Episode over, call reset before calling step"
 
-        # Support simpler interface as well
-        if isinstance(action, str) or isinstance(action, (int, np.integer)):
-            action = {"action": action}
+        if action == -1:
+            # 0.25m戻る
+            self.client.speak("戻ります")
+            print("戻ります")
+            self.client.move_forward(-0.25)
+            observations = self.sim.get_observations_at()
+            is_success = True
+            #print(observations)
+            
+        else:
+            # Support simpler interface as well
+            if isinstance(action, str) or isinstance(action, (int, np.integer)):
+                action = {"action": action}
 
-        observations, is_success = self.task.step(action=action)
+            observations, is_success = self.task.step(action=action)
 
         self._task.measurements.update_measures(
            action=action, task=self.task
@@ -343,6 +403,8 @@ class Env:
         if self._config.TRAINER_NAME in ["oracle", "oracle-ego"]:
             robot_pose = self.client.get_robot_pose()
             currPix = self.conv_grid(robot_pose.x, robot_pose.y)  ## Explored area marking
+            
+            observations["action_type"] = self.get_action_type(sim=self.sim, client=self.client)
             
             if self._config.TRAINER_NAME == "oracle-ego":
                 self.expose = self.task.measurements.measures["fow_map"].get_metric()
@@ -353,7 +415,8 @@ class Env:
                 
             patch = patch[currPix[1]-40:currPix[1]+40, currPix[0]-40:currPix[0]+40]
             #patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) + 90, order=0, reshape=False)
-            patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) - 90, order=0, reshape=False)
+            if "heading" in observations:
+                patch = ndimage.interpolation.rotate(patch, -(observations["heading"] * 180/np.pi) - 90, order=0, reshape=False)
             
             """
             patch_ = np.zeros((80, 80))

@@ -77,7 +77,7 @@ def merge_sim_episode_config(
 
 
 def move(client, x, y, theta, _sim):
-    print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
+    #print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
     
     while True:
         get_thread = threading.Thread(target=client.move_to_pose, args=(x, y, theta))
@@ -108,10 +108,12 @@ def move(client, x, y, theta, _sim):
 
 
 def move_forward(client, move_meter, x, y, theta, _sim):
-    print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
+    theta_deg = math.degrees(theta)
+    print(f"Moving to (x, y, theta)=({x}, {y}, {theta_deg}) ...")
     
     while True:
-        get_thread = threading.Thread(target=client.move_forward, args=(move_meter))
+        #get_thread = threading.Thread(target=client.move_forward, args=(move_meter,))
+        get_thread = threading.Thread(target=client.move_to_pose, args=(x, y, theta))
         get_thread.start()
         get_thread.join(10)  # get関数の終了を待つ（最大10秒）
 
@@ -125,6 +127,7 @@ def move_forward(client, move_meter, x, y, theta, _sim):
         _sim.unreset_position()
         result = client.get_last_command_result()[0]
         if result.success:
+            time.sleep(1)
             #print("Success!")
             return True
         else:
@@ -140,9 +143,10 @@ def move_forward(client, move_meter, x, y, theta, _sim):
 
 def rotate_in_place(client, rotate_angle, x, y, theta, _sim):
     print(f"Moving to (x, y, theta)=({x}, {y}, {theta}) ...")
-    
+
+    rotate_rad = math.radians(rotate_angle)
     while True:
-        get_thread = threading.Thread(target=client.rotate_in_place, args=(rotate_angle))
+        get_thread = threading.Thread(target=client.rotate_in_place, args=(rotate_rad,))
         get_thread.start()
         get_thread.join(10)  # get関数の終了を待つ（最大10秒）
 
@@ -156,7 +160,9 @@ def rotate_in_place(client, rotate_angle, x, y, theta, _sim):
         _sim.unreset_position()
         result = client.get_last_command_result()[0]
         if result.success:
+            time.sleep(1)
             #print("Success!")
+            
             return True
         else:
             with open(f"/home/{os.environ['USER']}/habitat2kachaka/kachaka-api/docs/KachakaErrorCode.json") as f:
@@ -937,7 +943,6 @@ class TopDownMap(Measure):
     def get_original_map(self, client=None):
         top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
-            self._map_resolution,
             client,        
         )
         
@@ -1036,7 +1041,7 @@ class TopDownMap(Measure):
 
     def update_map(self, agent_position):
         a_x, a_y = maps.to_grid(self.client, agent_position[0], agent_position[2])    
-        print(f"#######({a_x}, {a_y})##############")
+        #print(f"#######({a_x}, {a_y})##############")
         """
         # Don't draw over the source point
         if self._top_down_map[a_x, a_y] != maps.MAP_SOURCE_POINT_INDICATOR:
@@ -1108,7 +1113,6 @@ class ExploredMap(Measure):
     def get_original_map(self, client=None):
         top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
-            self._map_resolution,
             client,        
         )
 
@@ -1257,7 +1261,6 @@ class SmoothMapValue(Measure):
     def get_original_map(self, client):
         top_down_map, _, _, _, _ = maps.get_topdown_map(
             self._sim,
-            self._map_resolution,
             client
         )
 
@@ -1328,7 +1331,6 @@ class PictureRangeMap(Measure):
     def get_original_map(self, client=None):
         top_down_map, self._ind_x_min, self._ind_x_max, self._ind_y_min, self._ind_y_max = maps.get_topdown_map(
             self._sim,
-            self._map_resolution,
             client,
         )
         
@@ -1643,8 +1645,9 @@ class MoveForwardAction(Action):
         
         delta_x = self._meter * math.cos(theta_rad)
         delta_y = self._meter * math.sin(theta_rad)  
-        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
-        print("MOVE_FORWARD " + str(self._meter) + "[m]")
+        theta_deg = math.degrees(theta_rad)
+        #print(f"NOW: ({x}, {y}), theta={theta_deg}") 
+        print(f"MOVE_FORWARD {self._meter}[m]")
         
         #is_success = move(self._client, x+delta_x, y+delta_y, theta_rad, self._sim)
         is_success = move_forward(self._client, self._meter, x+delta_x, y+delta_y, theta_rad, self._sim)
@@ -1673,12 +1676,12 @@ class TurnLeftAction(Action):
         y = state["position"][2]
         theta_rad = state["rotation"]
         
-        angle = math.radians(self._angle)
-        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
-        print("TURN_LEFT " + str(self._angle) + "[度]")
+        theta_deg = math.degrees(theta_rad)
+        #print(f"NOW: ({x}, {y}), theta={theta_deg}") 
+        print(f"TURN_LEFT {self._angle}[度]")
         
         #is_success = move(self._client, x, y, theta_rad+angle, self._sim)
-        is_success = rotate_in_place(self._client, self._angle, x, y, theta_rad+angle, self._sim)
+        is_success = rotate_in_place(self._client, self._angle, x, y, theta_deg+self._angle, self._sim)
         return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
@@ -1705,17 +1708,17 @@ class TurnRightAction(Action):
         y = state["position"][2]
         theta_rad = state["rotation"]
         
-        angle = math.radians(-self._angle)
-        print(f"NOW: ({x}, {y}), theta={theta_rad}") 
-        print("TURN_RIGHT " + str(-self._angle) + "[度]")
+        theta_deg = math.degrees(theta_rad)
+        #print(f"NOW: ({x}, {y}), theta={theta_deg}") 
+        print(f"TURN_RIGHT {self._angle}[度]")
         
         #is_success = move(self._client, x, y, theta_rad+angle, self._sim)
-        is_success = rotate_in_place(self._client, self._angle, x, y, theta_rad+angle, self._sim)
+        is_success = rotate_in_place(self._client, self._angle, x, y, theta_deg+self._angle, self._sim)
         return self._sim.get_observations_at(), is_success
     
     def set_client(self, client):
         self._client = client
-        self._angle = 30
+        self._angle = -30
 
 
 @registry.register_task_action
